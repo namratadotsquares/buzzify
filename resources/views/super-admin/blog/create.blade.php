@@ -1,0 +1,1159 @@
+@extends('../layout/' . $layout)
+
+
+
+@section('subhead') 
+    <title>{{ __('admin.add_blog') }} - {{ setting('site_name') }}</title> 
+@endsection 
+
+
+
+@section('subcontent')
+    @include('../layout/components/top-bar')
+
+    <link href="{{ asset('dist/css/tagsinput.css') }}" rel="stylesheet" type="text/css">
+    <style>
+        .accordion-content {
+            display: none;
+            border: 1px solid #edebeb;
+            padding: 10px;
+            margin-top: 25px;
+        }
+
+        a {
+            cursor: pointer;
+        }
+    </style>
+
+    <div class="intro-y flex items-center mt-8">
+
+        <h2 class="text-lg font-medium mr-auto">{{ __('admin.add_blog') }}</h2>
+
+    </div>
+
+
+
+    <form id="addUpdateBlog">
+
+
+
+        <div class="grid grid-cols-12 gap-6 mt-5">
+
+            <div class="intro-y col-span-12 lg:col-span-12 bg_">
+
+                <div class="intro-y box p-5">
+
+                    <div class="mt-3">
+
+
+
+                    </div>
+
+                    <input type="hidden" name="edit_lang" id="edit_lang" value="en">
+                    <input type="hidden" name="title_en" id="title_en" value="">
+                    <input type="hidden" name="title_hi" id="title_hi" value="">
+                    <textarea name="description_en" id="description_en" style="display:none;"></textarea>
+                    <textarea name="description_hi" id="description_hi" style="display:none;"></textarea>
+                    <div class="mt-3">
+                        <label>Edit Translation</label>
+                        <div class="mt-2">
+                            <select data-placeholder="Select language" class="tail-select w-full" id="edit_lang_select">
+                                <option value="en" selected>English</option>
+                                <option value="hi">Hindi</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="mt-3">
+
+                        <div class="grid grid-cols-12 gap-4 row-gap-3">
+
+                            <div class="col-span-12 sm:col-span-6">
+
+                                <label>{{ __('admin.language') }} <span class="required">*</span></label>
+
+                                <div class="mt-2">
+
+                                    <select data-placeholder="{{ __('admin.select_language') }}" id="language"
+                                        name="language[]" multiple class="tail-select w-full">
+
+                                        @foreach ($languages as $lang)
+                                            <option @if ($lang->language == 'en') selected @endif
+                                                value="{{ $lang->language }}">{{ $lang->name }}</option>
+                                        @endforeach
+
+                                    </select>
+
+                                </div>
+
+                            </div>
+
+                            <div class="col-span-12 sm:col-span-6">
+
+                                <label>{{ __('admin.category') }} <span class="required">*</span></label>
+
+                                <div class="mt-2">
+
+                                    <select data-placeholder="{{ __('admin.select_category') }}" id="category_id"
+                                        name="category_id[]" multiple class="tail-select w-full">
+
+                                        <!-- <option value="" >{{ __('admin.select_category') }}</option> -->
+
+                                        @foreach ($category as $cat)
+                                            <option value="{{ $cat->id }}">{{ $cat->name }}</option>
+                                        @endforeach
+
+                                    </select>
+
+                                </div>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+
+
+                    <div class="mt-3">
+
+                        <label>{{ __('admin.title') }} <span class="required">*</span></label>
+
+                        <input type="text" class="input w-full border mt-2" name="title" id="blogTitle"
+                            placeholder="{{ __('admin.title_placeholder') }}" onkeyup="convertToSlugIfEnglish(this.value)"
+                            onblur="convertToSlugIfEnglish(this.value)">
+
+                    </div>
+                      <div class="mt-3 float-right">
+                          <button type="button" id="rewrite_title_button" onclick="showtitlerewrite();" class="button w-35 bg-theme-1 text-white">+ Rewrite Title</button>
+                    </div>
+                    <div class="mt-3 p-5">
+                        <div class="accordion">
+                            <div class="accordion-content mt-3" id="accordionTitle">
+                                <div class="grid grid-cols-12 gap-4 row-gap-3">
+                                    <div class="col-span-12 sm:col-span-3">
+                                        <label>Creativity</label>
+                                        <div class="mt-2">
+                                            <select data-placeholder="Select creativity level"  class="tail-select w-full" name="creativity" id="creativity_title">
+                                                <option value="0">Repetitive</option>
+                                                <option value="0.25"> Deterministic</option>																															
+                                                <option value="0.5" selected=""> Original</option>																															
+                                                <option value="0.75"> Creative</option>																															
+                                                <option value="1"> Imaginative</option>																																							
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="col-span-12 sm:col-span-3">
+                                        <label>Tone of Voice</label>
+                                        <div class="mt-2">
+                                            <select id="tone_title" name="tone" data-placeholder="Select tone of voice" class="tail-select w-full">
+                                                <option value="Professional" selected=""> Professional</option>	
+                                                <option value="Exciting"> Exciting</option>	
+                                                <option value="Friendly"> Friendly</option>	
+                                                <option value="Witty"> Witty</option>	
+                                                <option value="Humorous"> Humorous</option>	
+                                                <option value="Convincing"> Convincing</option>	
+                                                <option value="Empathetic"> Empathetic</option>	
+                                                <option value="Inspiring"> Inspiring</option>	
+                                                <option value="Supportive"> Supportive</option>	
+                                                <option value="Trusting"> Trusting</option>	
+                                                <option value="Playful"> Playful</option>	
+                                                <option value="Excited"> Excited</option>	
+                                                <option value="Positive"> Positive</option>	
+                                                <option value="Negative"> Negative</option>	
+                                                <option value="Engaging"> Engaging</option>	
+                                                <option value="Worried"> Worried</option>	
+                                                <option value="Urgent"> Urgent</option>	
+                                                <option value="Passionate"> Passionate</option>	
+                                                <option value="Informative"> Informative</option>
+                                                <option value="Funny">Funny</option>
+                                                <option value="Casual"> Casual</option>																																																														
+                                                <option value="Sarcastic"> Sarcastic</option>																																																																																												
+                                                <option value="Dramatic"> Dramatic</option>																																																													
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="col-span-12 sm:col-span-3">
+                                        <label>Sentimate</label>
+                                        <div class="mt-2">
+                                            <select id="sentimate_title" name="sentimate" data-placeholder="Select tone of voice" class="tail-select w-full" >
+                                                <option value="Positive" selected>Positive</option>
+                                                <option value="Negative">Negative</option>
+                                                <option value="Neutral"> Neutral </option>																															
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="col-span-12 sm:col-span-3">
+                                        <label>Translate</label>
+                                        <div class="mt-2">
+                                            <select id="translate_title" name="translate" class="input w-full border">
+                                                <option value="no">No</option>
+                                                <option value="yes" selected>Yes</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="col-span-12 sm:col-span-3">
+                                        <label>Max Result Length</label>
+                                        <input type="number" class="input w-full border mt-2 " id="words_title" name="words" placeholder="e.g. 25" max="1000" value="25">
+                                    </div>
+                                    <div class="col-span-12 sm:col-span-6">
+                                        <input type="button" class="button w-35 bg-theme-1 text-white" value="Submit" id="rewrite_submit">
+                                    </div>  
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-3">
+
+                        <label>{{ __('admin.description') }} </label>
+
+                        <div class="mt-2">
+
+                            <div class="preview">
+
+                                <textarea name="description" id="blogdescription"></textarea>
+                                 <small id="wordCountMessage" style="color: red;"></small>
+                            </div>
+
+                        </div>
+                           <div class="mt-3 float-right">
+                       <button type="button" id="rewrite_des_button" onclick="showdisrewrite();" class="button w-35 bg-theme-1 text-white">+ Rewrite Description</button>
+                    </div>
+                    <div class="mt-3 p-5">
+                        <div class="accordion">
+                            <div class="accordion-content mt-3" id="accordionDes">
+                                <div class="grid grid-cols-12 gap-4 row-gap-3">
+                                    <div class="col-span-12 sm:col-span-3">
+                                        <label>Creativity</label>
+                                        <div class="mt-2">
+                                            <select  data-placeholder="Select creativity level"  class="tail-select w-full" name="creativity" id="creativity_des">
+                                                <option value="0">Repetitive</option>
+                                                <option value="0.25"> Deterministic</option>																															
+                                                <option value="0.5" selected=""> Original</option>																															
+                                                <option value="0.75"> Creative</option>																															
+                                                <option value="1"> Imaginative</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="col-span-12 sm:col-span-3">
+                                        <label>Tone of Voice</label>
+                                        <div class="mt-2">
+                                            <select id="tone_des" name="tone" data-placeholder="Select tone of voice" class="tail-select w-full">
+                                                <option value="Professional" selected=""> Professional</option>	
+                                                <option value="Exciting"> Exciting</option>	
+                                                <option value="Friendly"> Friendly</option>	
+                                                <option value="Witty"> Witty</option>	
+                                                <option value="Humorous"> Humorous</option>	
+                                                <option value="Convincing"> Convincing</option>	
+                                                <option value="Empathetic"> Empathetic</option>	
+                                                <option value="Inspiring"> Inspiring</option>	
+                                                <option value="Supportive"> Supportive</option>	
+                                                <option value="Trusting"> Trusting</option>	
+                                                <option value="Playful"> Playful</option>	
+                                                <option value="Excited"> Excited</option>	
+                                                <option value="Positive"> Positive</option>	
+                                                <option value="Negative"> Negative</option>	
+                                                <option value="Engaging"> Engaging</option>	
+                                                <option value="Worried"> Worried</option>	
+                                                <option value="Urgent"> Urgent</option>	
+                                                <option value="Passionate"> Passionate</option>	
+                                                <option value="Informative"> Informative</option>
+                                                <option value="Funny">Funny</option>
+                                                <option value="Casual"> Casual</option>																																																														
+                                                <option value="Sarcastic"> Sarcastic</option>																																																																																												
+                                                <option value="Dramatic"> Dramatic</option>																																																													
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="col-span-12 sm:col-span-3">
+                                        <label>Sentimate</label>
+                                        <div class="mt-2">
+                                            <select id="sentimate_des" name="sentimate" data-placeholder="Select tone of voice" class="tail-select w-full" >
+                                                <option value="Positive" selected>Positive</option>
+                                                <option value="Negative">Negative</option>
+                                                <option value="Neutral"> Neutral </option>																															
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="col-span-12 sm:col-span-3">
+                                        <label>Translate</label>
+                                        <div class="mt-2">
+                                            <select id="translate_des" name="translate" class="input w-full border">
+                                                <option value="no">No</option>
+                                                <option value="yes" selected>Yes</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="col-span-12 sm:col-span-3">
+                                        <label>Max Result Length</label>
+                                        <input type="number" class="input w-full border mt-2 " id="words_des" name="words" placeholder="e.g. 80" max="1000" value="80">
+                                    </div>
+                                    <div class="col-span-12 sm:col-span-6">
+                                        <input type="button" class="button w-35 bg-theme-1 text-white" value="Submit" id="rewrite_desSubmit">
+                                    </div>  
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    </div>
+                    <div class="mt-3">
+                        <label>{{__('admin.location')}}</label>
+                        <input type="text" class="input w-full border mt-2" name="location" id="location" data-role="locationinput" value="" placeholder="{{__('admin.location_placeholder')}}" >
+                        <input type="text" name="latitude"  id="latitude" style="display:none;" value="@if(isset($blog->latitude)) {{$blog->latitude}} @endif">
+                        <input type="text" name="longitude"  id="longitude" style="display:none;"  value="@if(isset($blog->longitude)) {{$blog->longitude}} @endif">
+                    </div>
+                    <div class="mt-3">
+                        <label class="cursor-pointer select-none width-25" for="check_location_radius">{{__('admin.check_location_radius')}}</label>
+                        <input type="checkbox" class="input border mt-2" name="is_location_radius" id="check_location_radius" data-role="check_location_radiusinput">
+                    </div>
+                    <div class="mt-3">
+
+                        <label>Swipe Left Mode Details</label>
+
+                        <input type="text" class="input w-full border mt-2" name="swipe_text"
+                            placeholder="swipe left more details" value="swipe left more details">
+
+                    </div>
+
+                    <div class="mt-3">
+
+                        <div class="col-span-12 sm:col-span-4">
+
+                            <input type="hidden" name="banner_image" id="banner_image" value="">
+
+                            <label>({{ __('admin.banner_resolution') }}) <span class="required">*</span></label>
+
+                            <div class="col-span-12 sm:col-span-12">
+
+                                <input type="button" class="button w-30 bg-theme-1 text-white"
+                                    value="{{ __('admin.upload_banner_image') }}"
+                                    onclick="triggerFileInput('BannerimageuploadBtn')">
+
+
+
+                                <input class="BannerimageuploadBtn hide" id="image" type="file" multiple="multiple"
+                                    name="image[]"
+                                    onchange="uploadMultipleBannerImage(this,'Bannerimage_image_add','add',0);"
+                                    accept="image/jpg, image/jpeg, image/png" />
+
+                            </div>
+
+
+
+                        </div>
+
+                    </div>
+
+                    <div class="mt-3">
+
+                        <div class="col-span-12 sm:col-span-12 mt-3 width-float">
+
+                            <div id="Bannerimage_image_add hide pull-left">
+
+                                <div id='preview'></div>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                    <div class="text-right mt-8">
+
+                        <a href="{{ url('blog/') }}/{{ $layout }}/{{ $theme }}"
+                            class="button w-24 border dark:border-dark-5 text-gray-700 dark:text-gray-300 mr-1">{{ __('admin.back') }}</a>
+
+                        @can('blog-create')
+                            @if (auth()->check() && auth()->user()->type === 'admin')
+                                <button type="button" id="createBtn" class="button w-24 bg-theme-1 text-white"
+                                    onclick="syncBlogTranslationFields(); addUpdateBlog(event,'addUpdateBlog','create')">{{ __('admin.create') }}</button>
+                            @endif
+                        @endcan
+
+                        <button type="button" id="createBtn" class="button bg-theme-1 text-white"
+                            onclick="syncBlogTranslationFields(); addUpdateBlog(event,'addUpdateBlog','draft')">{{ __('admin.save_draft') }}</button>
+
+                    </div>
+
+                    <div class="grid grid-cols-12 gap-4 row-gap-3">
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+
+
+        <div></div>
+
+
+
+        <div class="grid grid-cols-12 gap-6 mt-5">
+
+            <div class="intro-y col-span-12 lg:col-span-12">
+
+                <div class="intro-y box p-5">
+
+                    <div class="mt-3">
+
+                        <div class="col-span-12 sm:col-span-4">
+
+                            <input type="hidden" name="audio_file_upload" id="audio_file_upload" value="">
+
+                            <label>({{ __('admin.mp3_allowed') }})</label>
+
+                            <div class="col-span-12 sm:col-span-12">
+
+                                <input type="button" class="button w-30 bg-theme-1 text-white"
+                                    value="{{ __('admin.upload_audio_image') }}" onclick="triggerFileInput('audio_file')">
+
+
+
+                                <input class="audio_file hide" id="audio_file" type="file" name="audio_file"
+                                    onchange="uploaudiofile(this,'audio_file_add','add',0);" accept="audio/mp3" />
+
+                            </div>
+
+
+
+                        </div>
+
+                    </div>
+
+
+
+                    <div class="mt-3">
+
+                        <div class="col-span-12 sm:col-span-12 mt-3">
+
+                            <div id="audio_file_add hide">
+
+                                <div id='audiopreview'></div>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+
+
+                    <div class="mt-3">
+
+                        <label>{{ __('admin.youtube_url') }}</label>
+
+                        <input type="text" class="input w-full border mt-2" name="video_url"
+                            placeholder="{{ __('admin.youtube_url_placeholder') }}">
+
+                    </div>
+
+
+
+                    <div class="mt-3">
+
+                        <label>{{ __('admin.blog_url') }}</label>
+
+                        <input type="text" class="input w-full border mt-2" name="url"
+                            placeholder="{{ __('admin.blog_url_placeholder') }}">
+
+                    </div>
+                         <div class="mt-3">
+
+                        <label>{{ __('admin.source_name') }}</label>
+
+                        <input type="text" class="input w-full border mt-2" name="source_name"
+                            placeholder="{{ __('admin.source_name_placeholder') }}">
+
+                    </div>
+
+
+
+
+
+
+                    <div class="mt-3">
+
+                        <div class="grid grid-cols-12 gap-4 row-gap-3">
+
+                            <div class="col-span-12 sm:col-span-4">
+
+                                <label>{{ __('admin.schedule_date') }} </label>
+
+                                <input type="date" class="input w-full border mt-2 form-control" name="schedule_date"
+                                    placeholder="{{ __('admin.schedule_date_placeholder') }}">
+
+                            </div>
+
+                            <div class="col-span-12 sm:col-span-3">
+
+                                <label>{{ __('admin.schedule_time') }}</label>
+
+                                <input type="time" class="input w-full border mt-2" name="schedule_time"
+                                    placeholder="{{ __('admin.schedule_time_placeholder') }}">
+
+                            </div>
+
+
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+
+
+        <div class="intro-y flex items-center mt-8">
+
+            <h2 class="text-lg font-medium mr-auto">{{ __('admin.text_speech') }}</h2>
+
+        </div>
+
+        <div class="grid grid-cols-12 gap-6 mt-5">
+
+            <div class="intro-y col-span-12 lg:col-span-12">
+
+                <div class="intro-y box p-5">
+
+                    <div class="mt-3">
+
+                        <div class="grid grid-cols-12 gap-4 row-gap-3">
+
+                            <div class="col-span-12 sm:col-span-6">
+
+                                <label>{{ __('admin.accent') }} / {{ __('admin.voice') }}</label>
+
+                                <div class="mt-2">
+                                    @php
+                                        $currentAccentSetting = setting('blog_accent_code');
+                                        $accentVoiceOptions = \Helpers::getBlogSpeechAccentVoiceOptions($currentAccentSetting);
+                                    @endphp
+
+                                    <select data-placeholder="Select Accent" id="blog_accent_code" name="blog_accent_code" 
+                                        class="tail-select w-full"> 
+
+                                        <option value="">{{ __('admin.accent_plceholder') }}</option>
+
+                                        @foreach ($accentVoiceOptions as $accentCode => $label)
+                                            <option @if ($accentCode == $currentAccentSetting) selected @endif value="{{ $accentCode }}">{{ $label }}</option>
+                                        @endforeach
+
+                                    </select>
+
+                                </div>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+
+
+        <div></div>
+
+        <div class="intro-y flex items-center mt-8">
+
+            <h2 class="text-lg font-medium mr-auto">{{ __('admin.seo_details') }}</h2>
+
+        </div>
+
+        <div class="grid grid-cols-12 gap-6 mt-5">
+
+            <div class="intro-y col-span-12 lg:col-span-12">
+
+                <div class="intro-y box p-5">
+
+                    <div class="mt-3">
+
+                        <label>{{ __('admin.slug') }} <span class="required">*</span></label>
+
+                        <input type="text" class="input w-full border mt-2" id="slug" name="slug"
+                            placeholder="{{ __('admin.slug_placeholder') }}" onblur="validateSlug(this.value)">
+
+                    </div>
+
+
+
+                    <div class="mt-3">
+
+                        <label>{{ __('admin.tags') }} <font class="font-size10 text-danger">
+                                ({{ __('admin.comma_saperate') }})</font></label>
+
+                        <input type="text" class="input w-full border mt-2" name="tags" data-role="tagsinput"
+                            placeholder="{{ __('admin.tags_placeholder') }}" style="display:none;">
+
+                    </div>
+
+                    <div class="mt-3">
+
+                        <label>{{ __('admin.title') }} ({{ __('admin.meta_tag') }})</label>
+
+                        <input type="text" class="input w-full border mt-2" name="seo_title"
+                            placeholder="{{ __('admin.title_placeholder') }}">
+
+                    </div>
+
+                    <div class="mt-3">
+
+                        <label>{{ __('admin.keywords') }} ({{ __('admin.meta_tag') }})</label>
+
+                        <input type="text" class="input w-full border mt-2" name="seo_keyword"
+                            placeholder="{{ __('admin.keywords_placeholder') }}">
+
+                    </div>
+
+                    <div class="mt-3">
+
+                        <label>{{ __('admin.tags') }} ({{ __('admin.meta_tag') }})</label>
+
+                        <input type="text" class="input w-full border mt-2" name="seo_tag" data-role="tagsinput"
+                            placeholder="{{ __('admin.tags_placeholder') }}" style="display:none;">
+
+                    </div>
+
+                    <div class="mt-3">
+
+                        <label>{{ __('admin.description') }} ({{ __('admin.meta_tag') }})</label>
+
+                        <div class="mt-2">
+
+                            <div class="preview">
+
+                                <textarea name="seo_description" class="input w-full border mt-2"></textarea>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+                    
+
+                </div>
+
+            </div>
+
+        </div>
+
+
+
+        <div></div>
+
+        <div class="intro-y flex items-center mt-8">
+            <h2 class="text-lg font-medium mr-auto">{{ __('admin.visibility') }}</h2>
+            @if(auth()->check() && auth()->user()->type === 'admin')
+                <a href="{{ url('blog-visibility-options/side-menu/light') }}" class="button button--sm border text-gray-600 text-xs" style="font-size:11px;padding:4px 10px;" title="Manage visibility options">
+                    ⚙ Manage
+                </a>
+            @endif
+        </div>
+
+        <div class="grid grid-cols-12 gap-6 mt-5">
+            <div class="intro-y col-span-12 lg:col-span-12">
+                <div class="intro-y box p-5">
+
+                    @php
+                        $visibilityOptions = \App\Models\BlogVisibilityOption::getActive();
+                    @endphp
+
+                    @if($visibilityOptions->isEmpty())
+                        <p class="text-gray-400 text-sm">No visibility options configured. <a href="{{ url('blog-visibility-options/side-menu/light') }}" class="text-theme-1">Add options →</a></p>
+                    @else
+                        @foreach($visibilityOptions as $visOpt)
+                            <div class="mt-3">
+                                <div class="flex items-center text-gray-700 dark:text-gray-500 mt-2">
+                                    <label class="cursor-pointer select-none width-25" for="vis_{{ $visOpt->field_key }}">
+                                        {{ $visOpt->label }}
+                                    </label>
+                                    <input type="checkbox"
+                                        class="input border mr-2 visible-checkbox"
+                                        id="vis_{{ $visOpt->field_key }}"
+                                        name="{{ $visOpt->field_key }}"
+                                        @if(old($visOpt->field_key)) checked="checked" @endif>
+                                </div>
+                            </div>
+                        @endforeach
+                    @endif
+
+                </div>
+            </div>
+        </div>
+
+
+        <style>
+            input[type="checkbox"].visible-checkbox {
+                width: 18px !important;
+                height: 18px !important;
+                border: 2px solid #000 !important;
+                accent-color: #000 !important;
+                -webkit-appearance: checkbox !important;
+                appearance: checkbox !important;
+                vertical-align: middle;
+            }
+            input[type="checkbox"].visible-checkbox:focus {
+                outline: 2px solid rgba(0,0,0,0.15);
+            }
+            .tail-select .select-dropdown,
+            .tail-select .select-list,
+            .ts-wrapper .ts-list,
+            .select2-container .select2-dropdown,
+            .select2-container .select2-results,
+            .select-dropdown,
+            .dropdown-menu {
+                z-index: 99999 !important;
+            }
+        </style>
+
+        <div class="intro-y flex items-center mt-8">
+
+            <h2 class="text-lg font-medium mr-auto">Voting question</h2>
+
+        </div>
+
+        <div class="grid grid-cols-12 gap-6 mt-5">
+
+            <div class="intro-y col-span-12 lg:col-span-12">
+
+                <div class="intro-y box p-5">
+
+                    <div class="col-span-12 sm:col-span-3">
+
+                        <div class="mt-3">
+
+                            <label>{{ __('admin.enable_voting') }}</label>
+
+                            <div class="mt-2">
+
+                                <input type="checkbox" name="is_voting_enable" id="is_voting_enable"
+                                    class="input input--switch border">
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                    <div class="mt-3 showTopicInput hide">
+
+                        <div class="flex items-center text-gray-700 dark:text-gray-500 mt-2" style="display: contents;">
+
+
+
+                            <input type="text" class="input border mr-2" id="" name="VotingQuestion"
+                                value="" placeholder="Enter the topic" style="width: 50%">
+
+                        </div>
+
+                    </div>
+
+
+
+                    <div class="mt-3">
+
+                        <div class="flex items-center text-gray-700 dark:text-gray-500 mt-2">
+
+                            <label class=" select-none width-25" for="">Option Type</label>
+
+                            <br>
+
+                            <div class="mt-3">
+
+                                <div class="flex items-center text-gray-700 dark:text-gray-500 mt-2"
+                                    style="margin-right: 10px;">
+
+
+
+                                    <input type="radio" class="input border mr-2" id="" name="optiontype"
+                                        value="0"> Yes/No
+
+                                </div>
+
+                            </div>
+
+
+
+                            <div class="col-5">
+
+
+
+                            </div>
+
+                            <div class="col-5">
+
+
+
+                            </div>
+
+
+
+
+
+
+
+                            <div class="mt-3">
+
+                                <div class="flex items-center text-gray-700 dark:text-gray-500 mt-2">
+
+
+
+                                    <input type="radio" class="input border mr-2" id="" name="optiontype"
+                                        value="1"> Agree/Disagree
+
+                                </div>
+
+                            </div>
+
+
+
+
+
+
+
+
+
+                        </div>
+
+                    </div>
+
+
+
+                    <!--<div class="mt-3">
+
+                                    <div class="grid grid-cols-12 gap-4 row-gap-3">
+
+                                        <div class="col-span-12 sm:col-span-6">
+
+                                            <label>Lat</label>
+
+                                            <div class="mt-2">
+
+                                                 <input type="text" class="input w-full border mt-2" name="latitude" id="lat" placeholder="">
+
+                                            </div>
+
+                                        </div>
+
+                                        <div class="col-span-12 sm:col-span-6">
+
+                                            <label>long</label>
+
+                                            <div class="mt-2">
+
+                                                 <input type="text" class="input w-full border mt-2" name="longitude" id="lat" placeholder="">
+
+                                            </div>
+
+                                        </div>
+
+                                    </div>
+
+                                </div>
+
+                                
+
+                                <div id="map" style="height:250px; width: 800px;" class="my-3"></div>-->
+
+
+
+                    <div class="text-right mt-8">
+
+                        <a href="{{ url('blog/') }}/{{ $layout }}/{{ $theme }}"
+                            class="button w-24 border dark:border-dark-5 text-gray-700 dark:text-gray-300 mr-1">{{ __('admin.back') }}</a>
+
+                        @can('blog-create')
+                            @if (auth()->check() && auth()->user()->type === 'admin')
+                                <button type="button" id="createBtn" class="button w-24 bg-theme-1 text-white"
+                                    onclick="syncBlogTranslationFields(); addUpdateBlog(event,'addUpdateBlog','create')">{{ __('admin.create') }}</button>
+                            @endif
+                        @endcan
+
+                        <button type="button" id="createBtn" class="button bg-theme-1 text-white"
+                            onclick="syncBlogTranslationFields(); addUpdateBlog(event,'addUpdateBlog','draft')">{{ __('admin.save_draft') }}</button>
+
+                    </div>
+
+
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </form>
+    <script src="https://maps.googleapis.com/maps/api/js?key={{env('Google_api')}}&loading=async&libraries=places"></script>
+    <!-- It is required-inline JS to put here because following js are making dynamic from the admin setting -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+        CKEDITOR.replace('blogdescription', {
+
+            height: '250px',
+
+        });
+        
+    </script>
+    <script>
+        function getBlogCreateLang() {
+            return ($('#edit_lang').val() || 'en').toString();
+        }
+
+        function convertToSlugIfEnglish(Text) {
+            if (getBlogCreateLang() === 'en' && typeof convertToSlug === 'function') {
+                convertToSlug(Text);
+            }
+        }
+
+        function syncBlogTranslationFields() {
+            var lang = getBlogCreateLang();
+            var titleVal = $('#blogTitle').val();
+            var descVal = (CKEDITOR.instances && CKEDITOR.instances.blogdescription) ?
+                CKEDITOR.instances.blogdescription.getData() :
+                ($('#blogdescription').val() || '');
+
+            if (lang === 'hi') {
+                $('#title_hi').val(titleVal);
+                $('#description_hi').val(descVal);
+            } else {
+                $('#title_en').val(titleVal);
+                $('#description_en').val(descVal);
+            }
+        }
+
+        function loadBlogTranslationFields(lang) {
+            var titleVal = $('#title_' + lang).val() || '';
+            var descVal = $('#description_' + lang).val() || '';
+            $('#blogTitle').val(titleVal);
+            if (CKEDITOR.instances && CKEDITOR.instances.blogdescription) {
+                CKEDITOR.instances.blogdescription.setData(descVal);
+            } else {
+                $('#blogdescription').val(descVal);
+            }
+        }
+
+        function switchBlogEditLang(lang) {
+            syncBlogTranslationFields();
+            $('#edit_lang').val(lang);
+            loadBlogTranslationFields(lang);
+        }
+
+        function showtitlerewrite() {
+            if ($('#accordionTitle').is(':hidden')) {
+                $('#accordionTitle').css('display', 'block');
+            } else {
+                $('#accordionTitle').css('display', 'none');
+            }
+        }
+
+        function showdisrewrite() {
+            if ($('#accordionDes').is(':hidden')) {
+                $('#accordionDes').css('display', 'block');
+            } else {
+                $('#accordionDes').css('display', 'none');
+            }
+        }
+
+        function generateText(text, fieldType, creativity, tone, sentimate, words, translate, targetLang) {
+            $.ajax({
+                type: 'POST',
+                url: "{{ route('generateText') }}",
+                data: {
+                    "_token": "{{ csrf_token() }}",
+                    title: text,
+                    creativity: creativity,
+                    tone: tone,
+                    sentimate: sentimate,
+                    words: words,
+                    fieldType: fieldType,
+                    translate: translate,
+                    targetLang: targetLang
+                },
+                beforeSend: function() {
+                    $('#processing').show();
+                },
+                success: function(response) {
+                    if (response.choices && response.choices.length > 0 && response.choices[0].message && response.choices[
+                            0].message.content) {
+                        var generatedText = response.choices[0].message.content;
+                        var translatedText = response.translatedText || "";
+                        var currentLang = getBlogCreateLang();
+
+                        if (fieldType === 'title') {
+                            $('#blogTitle').val(generatedText);
+                            // Update hidden translation fields
+                            if (currentLang === 'en') {
+                                $('#title_en').val(generatedText);
+                                if (translatedText) $('#title_hi').val(translatedText);
+                            } else if (currentLang === 'hi') {
+                                $('#title_hi').val(generatedText);
+                                if (translatedText) $('#title_en').val(translatedText);
+                            }
+                        } else if (fieldType === 'description') {
+                            if (CKEDITOR.instances.blogdescription) {
+                                CKEDITOR.instances.blogdescription.setData(generatedText);
+                            } else {
+                                $('#blogdescription').val(generatedText);
+                            }
+                            // Update hidden translation fields
+                            if (currentLang === 'en') {
+                                $('#description_en').val(generatedText);
+                                if (translatedText) $('#description_hi').val(translatedText);
+                            } else if (currentLang === 'hi') {
+                                $('#description_hi').val(generatedText);
+                                if (translatedText) $('#description_en').val(translatedText);
+                            }
+                        }
+                    } else {
+                        console.error('Invalid response format:', response);
+                    }
+                },
+                complete: function() {
+                    $('#processing').hide();
+                },
+                error: function(error) {
+                    $('#processing').hide();
+                    console.error('Error:', error);
+                }
+            });
+        }
+
+        $(function() {
+            $('#edit_lang_select').on('change', function() {
+                switchBlogEditLang($(this).val());
+            });
+
+            CKEDITOR.on('instanceReady', function(evt) {
+                if (evt && evt.editor && evt.editor.name === 'blogdescription') {
+                    loadBlogTranslationFields(getBlogCreateLang());
+                }
+            });
+
+            $('#rewrite_submit').on('click', function() {
+                var creativity = $('#creativity_title').val();
+                var tone = $('#tone_title').val();
+                var sentimate = $('#sentimate_title').val();
+                var words = $('#words_title').val();
+                var translate = $('#translate_title').val();
+                var blogTitle = $('#blogTitle').val();
+                var targetLang = getBlogCreateLang();
+                generateText(blogTitle, 'title', creativity, tone, sentimate, words, translate, targetLang);
+            });
+
+            $('#rewrite_desSubmit').on('click', function() {
+                var creativity = $('#creativity_des').val();
+                var tone = $('#tone_des').val();
+                var sentimate = $('#sentimate_des').val();
+                var words = $('#words_des').val();
+                var translate = $('#translate_des').val();
+                var blogDescription = (CKEDITOR.instances && CKEDITOR.instances.blogdescription) ?
+                    CKEDITOR.instances.blogdescription.getData() :
+                    ($('#blogdescription').val() || '');
+                var targetLang = getBlogCreateLang();
+                generateText(blogDescription, 'description', creativity, tone, sentimate, words, translate, targetLang);
+            });
+        });
+
+        $(window).on('load', function() {
+            const input = document.getElementById("location");
+            if (!input || !window.google || !google.maps || !google.maps.places) {
+                return;
+            }
+            const autocomplete = new google.maps.places.Autocomplete(input);
+            autocomplete.addListener("place_changed", function() {
+                const place = autocomplete.getPlace();
+                if (!place.geometry) {
+                    alert("No details available for input: '" + place.name + "'");
+                    return;
+                }
+                $('#latitude').val(place.geometry.location.lat());
+                $('#longitude').val(place.geometry.location.lng());
+            });
+        });
+    </script>
+    
+
+
+    <!--<script>
+        let map;
+
+        function initMap() {
+
+            map = new google.maps.Map(document.getElementById("map"), {
+
+                center: {
+                    lat: -34.397,
+                    lng: 150.644
+                },
+
+                zoom: 8,
+
+                scrollwheel: true,
+
+            });
+
+            const uluru = {
+                lat: -34.397,
+                lng: 150.644
+            };
+
+            let marker = new google.maps.Marker({
+
+                position: uluru,
+
+                map: map,
+
+                draggable: true
+
+            });
+
+
+
+            google.maps.event.addListener(marker, 'position_changed',
+
+                function() {
+
+                    let lat = marker.position.lat()
+
+                    let lng = marker.position.lng()
+
+                    $('#lat').val(lat)
+
+                    $('#lng').val(lng)
+
+                })
+
+
+
+            google.maps.event.addListener(map, 'click',
+
+                function(event) {
+
+                    pos = event.latLng
+
+                    marker.setPosition(pos)
+
+                })
+
+        }
+    </script>
+
+                <script type="text/javascript" 
+                    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCo9Lrq8Oy2szdIToMBZBWj5RX8OCPn1Pw&callback=initMap"></script>--> 
+    <script>
+        // Accent/Voice selection is a single dropdown now; server derives the voice from the selected accent.
+    </script>
+@endsection

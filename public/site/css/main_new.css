@@ -1,0 +1,557 @@
+@import url('https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
+.jl_car_home .jelly_cus_h899 .jl_car_wrapper .jl_car_img_front {
+	padding-bottom: 60% !important;
+}
+.jl_car_home .row.jelly_cus_h899 .col-md-3 {
+	padding-right: 0px;
+	padding-left: 0px;
+}
+.jl_car_home .row.jelly_cus_h899 {
+	margin-right: -0px;
+	margin-left: -0px;
+}
+.jl_car_home .row.jelly_cus_h899.car_style3 .post-entry-content {
+	border-right: 0px solid #ddd !important;
+}
+.jl_car_home .row.jelly_cus_h899 .slick-arrow {
+	display: none !important;
+}
+.jl_car_home .row.jelly_cus_h899 .slick-dots {
+	display: none !important;
+}
+.jl_car_home .jelly_cus_h850 .jl_car_wrapper .jl_car_img_front {
+	padding-bottom: 70% !important;
+}
+.jl_car_home .row.jelly_cus_h850 .col-md-3 {
+	padding-right: 0px;
+	padding-left: 0px;
+}
+.jl_car_home .row.jelly_cus_h850 {
+	margin-right: -0px;
+	margin-left: -0px;
+}
+.jl_car_home .row.jelly_cus_h850.car_style3 .post-entry-content {
+	border-right: 0px solid #ddd !important;
+}
+.jl_car_home .row.jelly_cus_h850 .slick-arrow {
+	display: none !important;
+}
+.jl_car_home .row.jelly_cus_h850 .col-md-3 {
+	padding-bottom: 30px;
+}
+.jl_car_home .jelly_cus_h717 .jl_car_wrapper .jl_car_img_front {
+   padding-bottom: 120% !important;
+   }
+   .jl_car_home .row.jelly_cus_h717 .col-md-3 {
+      padding-right: 15px;
+      padding-left: 15px;
+   }
+   .jl_car_home .row.jelly_cus_h717 {
+      margin-right: -15px;
+      margin-left: -15px;
+   }
+   .jl_car_home .row.jelly_cus_h717 .slick-arrow {
+      display: none !important;
+   }
+   .jl_car_home .row.jelly_cus_h717 .col-md-3 {
+      padding-bottom: 30px;
+   } 
+.header_top_bar_wrapper .navigation_wrapper #jl_top_menu li a,
+.meta-category-small a,
+.item_slide_caption .post-meta.meta-main-img,
+.post-meta.meta-main-img,
+.post-meta-bot-in,
+.post-meta span,
+.single-post-meta-wrapper span,
+.comment time,
+.post_large_footer_meta,
+.blog_large_post_style .large_post_content .jelly_read_more_wrapper a,
+.love_post_view_header a,
+.header_date_display,
+.jl_continue_reading,
+.menu_post_feature .builder_cat_title_list_style li,
+.builder_cat_title_list_style li,
+.main_new_ticker_wrapper .post-date,
+.main_new_ticker_wrapper .news_ticker_title_style,
+.jl_rating_front .jl_rating_value,
+.pop_post_right_slider .headding_pop_post,
+.jl_main_right_number .jl_number_list,
+.jl_grid_more .jl_slider_readding,
+.page_builder_listpost.jelly_homepage_builder .jl_list_more a,
+.jl_s_slide_text_wrapper .banner-container .jl_ssider_more,
+.jl_post_meta .jl_author_img_w a,
+.jl_post_meta .post-date,
+.jl_large_builder.jelly_homepage_builder .jl_large_more,
+.jl_btn_load,
+.feature-image-link.image_post .jl_small_list_num,
+.social-count-plus .count,
+.social-count-plus .label,
+.jl_instagram .instagram-pics + .clear a,
+.single-post-meta-wrapper .jm-post-like,
+#commentform #submit,
+.wpcf7-form-control.wpcf7-submit,
+.comment-reply-link,
+.comment-edit-link {
+	font-family: Poppins !important;
+}
+#mainmenu > li > a,
+#content_nav .menu_moble_slide > li a,
+.header_layout_style3_custom .navigation_wrapper > ul > li > a,
+.header_magazine_full_screen .navigation_wrapper .jl_main_menu > li > a {
+	font-family: Poppins !important;
+	font-size: 15px !important;
+	font-weight: 600 !important;
+	text-transform: capitalize !important;
+	letter-spacing: -0.03em !important;
+}
+#menu-footer-menu li a,
+.footer-bottom .footer-left-copyright,
+.navigation_wrapper #mainmenu.jl_main_menu > li li > a {
+	font-family: Poppins !important;
+}
+#content_nav .menu_moble_slide > li a {
+	font-size: 15px !important;
+}
+.content_single_page p,
+.single_section_content .post_content,
+.single_section_content .post_content p {
+	font-size: 16px !important;
+}
+body,
+p,
+.date_post_large_display,
+#search_block_top #search_query_top,
+.tagcloud a,
+.format-quote a p.quote_source,
+.blog_large_post_style .large_post_content .jelly_read_more_wrapper a,
+.blog_grid_post_style .jelly_read_more_wrapper a,
+.blog_list_post_style .jelly_read_more_wrapper a,
+.pagination-more div a,
+.meta-category-small-builder a,
+.full-slider-wrapper .banner-carousel-item .banner-container .more_btn a,
+.single-item-slider .banner-carousel-item .banner-container .more_btn a {
+	font-family: Lato !important;
+	font-weight: 400 !important;
+}
+.single_section_content .post_content blockquote p {
+	font-size: 20px !important;
+}
+.wp-caption p.wp-caption-text {
+	font-size: 14px !important;
+}
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+h1 a,
+h2 a,
+h3 a,
+h4 a,
+h5 a,
+h6 a,
+.postnav #prepost,
+.postnav #nextpost,
+.bbp-forum-title,
+.single_post_arrow_content #prepost,
+.single_post_arrow_content #nextpost {
+	font-weight: 600 !important;
+	text-transform: capitalize !important;
+	letter-spacing: -0.03em !important;
+}
+.footer_carousel .meta-comment,
+.item_slide_caption h1 a,
+.tickerfloat,
+.box-1 .inside h3,
+.detailholder.medium h3,
+.feature-post-list .feature-post-title,
+.widget-title h2,
+.image-post-title,
+.grid.caption_header h3,
+ul.tabs li a,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+.carousel_title,
+.postnav a,
+.format-aside a p.aside_title,
+.date_post_large_display,
+.social-count-plus span,
+.sf-top-menu li a,
+.large_continue_reading span,
+.single_post_arrow_content #prepost,
+.single_post_arrow_content #nextpost,
+.cfs_from_wrapper .cfs_form_title,
+.comment-meta .comment-author-name,
+.jl_recent_post_number > li .jl_list_bg_num,
+.jl_recent_post_number .meta-category-small-text a,
+.jl_hsubt,
+.single_post_entry_content .post_subtitle_text,
+blockquote p {
+	font-family: Poppins !important;
+}
+.navigation_wrapper #mainmenu.jl_main_menu > li li > a {
+	font-size: 13px !important;
+	font-weight: 400 !important;
+	letter-spacing: -0.03em !important;
+	text-transform: capitalize !important;
+}
+.cat-item-2 span {
+	background: #ed1c1c !important;
+}
+.cat-item-3 span {
+	background: #0015ff !important;
+}
+.cat-item-4 span {
+	background: #d1783c !important;
+}
+.cat-item-5 span {
+	background: #6b34ba !important;
+}
+.cat-item-6 span {
+	background: #7fbc1e !important;
+}
+.cat-item-7 span {
+	background: #d66300 !important;
+}
+.cat-item-8 span {
+	background: #36c942 !important;
+}
+.cat-item-9 span {
+	background: #d800f9 !important;
+}
+/*
+
+
+
+
+
+/* New Page and element add css */
+
+
+
+
+.btn-fb {
+  display: inline-block;
+  border-radius: 1px;
+  text-decoration: none;
+  box-shadow: 0 2px 4px 0 rgba(0, 0, 0, 0.25);
+  transition: background-color 0.218s, border-color 0.218s, box-shadow 0.218s;
+}
+.fb-content, .btn-fb .btn-fb .fb-content {
+    display: block;
+    align-items: center;
+    width: 50px;
+    height: 50px;
+}
+.fb-content .logo, .btn-fb .btn-fb .fb-content .logo {
+  padding: 15px;
+  height: inherit;
+}
+.fb-content svg, .btn-fb .btn-fb .fb-content svg {
+  width: 18px;
+  height: 18px;
+}
+.fb-content p, .btn-fb .btn-fb .fb-content p {
+    width: 100%;
+    line-height: 23px;
+    letter-spacing: 0.21px;
+    text-align: center;
+    font-weight: 500;
+    font-family: "Roboto", sans-serif;
+    margin-bottom: 0px;
+    height: 30px;
+}
+.btn-fb {
+    padding-top: 0px;
+    background: #4267b2;
+    background-color: #3b5998;
+    width: 50px;
+    border-radius: 100px;
+    color: #fff !important;
+    text-align: center;
+    line-height: 20px;
+    display: block;
+    margin: 0px auto;
+}
+.btn-fb:hover {
+  box-shadow: 0 0 3px 3px rgba(59, 89, 152, 0.3);
+  text-decoration:none !important;
+}
+.btn-fb .fb-content p {
+  color: rgba(255, 255, 255, 0.87);
+}
+
+
+
+
+
+/* Set a style for all buttons */
+button {
+  background-color: #4CAF50;
+  color: white;
+  padding: 14px 20px;
+  margin: 8px 0;
+  border: none;
+  cursor: pointer;
+  width: 100%;
+  opacity: 0.9;
+}
+
+button:hover {
+  opacity:1;
+}
+
+/* Float cancel and delete buttons and add an equal width */
+.cancelbtn, .deletebtn {
+  float: left;
+  width: 50%;
+}
+
+/* Add a color to the cancel button */
+.cancelbtn {
+  background-color: #ccc;
+  color: black;
+}
+
+/* Add a color to the delete button */
+.deletebtn {
+  background-color: #f1041a;
+}
+
+/* Add padding and center-align text to the container */
+.container {
+  padding: 16px;
+  text-align: center;
+}
+
+/* The Modal (background) */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 99999;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: #474e5d8a;
+    padding-top: 50px;
+}
+
+/* Modal Content/Box */
+.modal-content {
+      background-color: #fefefe;
+    margin: 5% auto 15% auto;
+    border: 1px solid #888;
+    width: 400px
+}
+
+/* Style the horizontal ruler */
+hr {
+  border: 1px solid #f1f1f1;
+  margin-bottom: 25px;
+}
+ 
+/* The Modal Close Button (x) */
+.close {
+  position: absolute;
+  right: 35px;
+  top: 15px;
+  font-size: 40px;
+  font-weight: bold;
+  color: #f1f1f1;
+}
+
+.close:hover,
+.close:focus {
+  color: #f44336;
+  cursor: pointer;
+}
+
+/* Clear floats */
+.clearfix::after {
+  content: "";
+  clear: both;
+  display: table;
+}
+
+/* Change styles for cancel button and delete button on extra small screens */
+@media screen and (max-width: 300px) {
+  .cancelbtn, .deletebtn {
+     width: 100%;
+  }
+}
+
+
+.w-200 { width:200px;}
+
+
+.jl_post_type_icon {
+    color: #f74539;
+    background: #fff;
+    background: rgba(255, 255, 255, 0.8);
+    font-size: 20px !important;
+    height: 35px;
+    width: 35px;
+    line-height: 35px;
+    right: 20px;
+    position: absolute;
+    text-align: center;
+    top: 20px;
+    z-index: 1;
+    -webkit-border-radius: 100px;
+    -moz-border-radius: 100px;
+    border-radius: 100px;
+}
+.bokmark {
+	    background: #fff;
+    padding: 1px 5px;
+    border-radius: 100px;
+    width: 30px;
+    height: 30px;
+    text-align: center;
+    position: absolute;
+    font-size: 16px;
+}
+.bokmark:hover { text-decoration:none !important;}
+
+.active.bokmark {
+    background: #ec2625;
+    color: #fff;
+}
+
+.wrapper {
+    padding: 30px 50px;
+    border: 1px solid #ddd;
+    border-radius: 15px;
+    margin: 10px auto;
+    max-width: 600px;margin-bottom: 40px;
+}
+
+.profileimg img {
+    width: 110px;
+    height: 110px !important;
+    border-radius: 100px;
+    object-fit: cover;
+}
+
+#img-section p {
+    font-size: 12px;
+    color: #777;
+    margin-bottom: 10px;
+    text-align: center;
+}
+
+#deactivate p {
+    font-size: 12px;
+    color: #777;
+    margin-bottom: 10px;
+    text-align: center;
+}
+
+#img-section b,
+#img-section button,
+#deactivate b {
+    font-size: 14px
+}
+
+label {
+    margin-bottom: 0;
+    font-size: 14px;
+    font-weight: 500;
+    color: #777;
+    padding-left: 3px
+}
+
+.form-control {
+    border-radius: 3px;
+    height: 45px;
+    border: 1px solid #dedcdc;
+}
+input[placeholder] {
+    font-weight: 500
+}
+
+.form-control:focus {
+    box-shadow: none;
+    border: 1.5px solid #0779e4
+}
+
+
+.btn-primary-save {
+    outline: none;
+    height: 35px;
+    font-size: 12px;
+    letter-spacing: 1px;
+    line-height: 35px;
+    padding: 0 40px;
+    color: #FFF !important;
+    background: #0015ff;
+    cursor: pointer;
+    border: 0px;
+    margin-bottom: 15px;
+    font-weight: 300;
+    text-transform: uppercase;
+    -webkit-transition: 0.5s;
+    -moz-transition: 0.5s;
+    transition: 0.5s;
+    -webkit-border-radius: 5px;
+    -moz-border-radius: 5px;
+    border-radius: 5px;    width: 200px;
+}
+.btn-primary-cnl {
+    outline: none;    width: 200px;
+    height: 35px;
+    font-size: 12px;
+    letter-spacing: 1px;
+    line-height: 35px;
+    padding: 0 40px;
+    color: #FFF !important;
+    background: #000000;
+    cursor: pointer;
+    border: 0px;
+    margin-bottom: 15px;
+    font-weight: 300;
+    text-transform: uppercase;
+    -webkit-transition: 0.5s;
+    -moz-transition: 0.5s;
+    transition: 0.5s;
+    -webkit-border-radius: 5px;
+    -moz-border-radius: 5px;
+    border-radius: 5px;
+}
+
+
+.danger {
+    background-color: #fff;
+    color: #e20404;
+    border: 1px solid #ddd
+}
+
+.danger:hover {
+    background-color: #e20404;
+    color: #fff
+}
+
+.wrapper .row { margin-bottom:20px;}
+.mt-10 { margin-bottom:10px;text-align:center;margin-top: -70px;}
+
+.mt-sm-5 { margin-top:30px;}
+
+@media(max-width:576px) {
+    .wrapper {
+        padding: 25px 20px
+    }
+
+    #deactivate {
+        line-height: 18px
+    }
+}
+
+

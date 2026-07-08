@@ -1,0 +1,841 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use Illuminate\Http\Request;
+use App\Models\RssFeed;
+use App\Models\Category;
+use App\Models\BlogCategory;
+use App\Models\Blog;
+use App\Models\BlogImages;
+use App\Models\BlogTranslation;
+use App\Models\BlogActionLog;
+use App\Models\SiteContent;
+use Illuminate\Support\Facades\Validator;
+use Auth;
+use Carbon\Carbon;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
+use UploadImage as Image;
+
+class NewsApiController extends Controller
+{
+
+	function __construct()
+	{
+		$this->middleware('permission:news-api-post-list|news-api-post-save', ['only' => ['index', 'saveNewsApiPost']]);
+		$this->middleware('permission:news-api-post-list', ['only' => ['index']]);
+		$this->middleware('permission:news-api-post-save', ['only' => ['saveNewsApiPost']]);
+	}
+
+	/**
+	 * Generate an image using OpenAI Images API from title/description and save variants.
+	 */
+	public function generateAndSaveImageFromOpenAI($title, $description, $blog_id)
+	{
+		try {
+			$prompt = "Create a photorealistic news thumbnail image (no watermark or text) that represents the following article. Title: " . trim($title) . ". Description: " . trim($description) . ". Use realistic lighting and natural colors. Avoid cartoon or illustration styles. The subject should fill the frame edge-to-edge with no borders or empty space. Use a 3:2 aspect ratio.";
+			$apiKey = env('OPENAI_API_KEY', env('chatgpt_key'));
+			$imageSize = env('OPENAI_IMAGE_SIZE', '1536x1024');
+			$response = Http::withToken($apiKey)->post('https://api.openai.com/v1/images/generations', [
+				'model' => env('OPENAI_IMAGE_MODEL', 'gpt-image-1-mini'),
+				'prompt' => $prompt,
+				'n' => 1,
+				'size' => $imageSize,
+			]);
+
+			if ($response->failed()) {
+				$body = $response->body();
+				\Helpers::markOpenAiQuotaExpiredIfNeeded($body);
+				Log::warning('OpenAI image generation failed: ' . $body);
+				return false;
+			}
+
+			\Helpers::clearOpenAiQuotaExpired();
+			$body = $response->json();
+			$imageData = null;
+			if (isset($body['data'][0]['b64_json'])) {
+				$imageData = base64_decode($body['data'][0]['b64_json']);
+			} elseif (isset($body['data'][0]['url'])) {
+				$url = $body['data'][0]['url'];
+				$imageData = @file_get_contents($url);
+			}
+
+			if ($imageData) {
+				$basePath = public_path('/upload/blog/banner/');
+				@mkdir($basePath . 'original/', 0755, true);
+				@mkdir($basePath . '800/', 0755, true);
+				@mkdir($basePath . '360/', 0755, true);
+				@mkdir($basePath . '200/', 0755, true);
+				$name = time() . rand() . '.jpg';
+
+				$img = Image::make($imageData);
+				$img = $this->resizeToCanvas($img, 1200, 800);
+				$encoded = $this->encodeJpegWithinSize($img, 120 * 1024, 600 * 1024);
+				if (!$encoded) {
+					Log::warning('AI image encode failed.');
+					return false;
+				}
+				$destination = $basePath . 'original/' . $name;
+				file_put_contents($destination, $encoded['data']);
+
+				$this->resizeToCanvas(Image::make($destination), 800, 533)->save($basePath . '800/' . $name, 85, 'jpg');
+				$this->resizeToCanvas(Image::make($destination), 360, 240)->save($basePath . '360/' . $name, 85, 'jpg');
+				$this->resizeToCanvas(Image::make($destination), 200, 133)->save($basePath . '200/' . $name, 85, 'jpg');
+
+				BlogImages::insert([
+					'blog_id' => $blog_id,
+					'image' => $name,
+					'created_at' => now()
+				]);
+				return true;
+			}
+			Log::warning('OpenAI image generation returned empty image data.');
+			return false;
+		} catch (\Exception $e) {
+			Log::warning('OpenAI image generation failed: ' . $e->getMessage());
+			return false;
+		}
+	}
+
+	private function encodeJpegWithinSize($img, $minBytes, $maxBytes)
+	{
+		$best = null;
+		$bestDiff = PHP_INT_MAX;
+		for ($q = 90; $q >= 10; $q -= 5) {
+			$data = (string) $img->encode('jpg', $q);
+			$size = strlen($data);
+			if ($size >= $minBytes && $size <= $maxBytes) {
+				return ['data' => $data, 'quality' => $q, 'size' => $size];
+			}
+			$diff = min(abs($size - $minBytes), abs($size - $maxBytes));
+			if ($diff < $bestDiff) {
+				$bestDiff = $diff;
+				$best = ['data' => $data, 'quality' => $q, 'size' => $size];
+			}
+		}
+		return $best;
+	}
+
+	private function resizeToCanvas($img, $width, $height)
+	{
+		$img->resize($width, $height, function ($constraint) {
+			$constraint->aspectRatio();
+			$constraint->upsize();
+		});
+		// Ensure exact target dimensions when aspect ratio already matches closely.
+		if (method_exists($img, 'width') && method_exists($img, 'height')) {
+			$currentW = (int) $img->width();
+			$currentH = (int) $img->height();
+			if ($currentW > 0 && $currentH > 0 && ($currentW !== (int) $width || $currentH !== (int) $height)) {
+				$currentRatio = $currentW / $currentH;
+				$targetRatio = ((int) $width) / ((int) $height);
+				if (abs($currentRatio - $targetRatio) < 0.02) {
+					$img->resize($width, $height);
+				}
+			}
+		}
+		return $img;
+	}
+
+	private function fetchImageContentFromUrl($url)
+	{
+		if (!$url) {
+			return null;
+		}
+		try {
+			$response = Http::withHeaders([
+				'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+				'Accept' => 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
+			])->withOptions([
+				'allow_redirects' => true,
+			])->timeout(12)->get($url);
+
+			if (!$response->successful()) {
+				return null;
+			}
+
+			$contentType = $response->header('Content-Type');
+			if (!$contentType || stripos($contentType, 'image/') !== 0) {
+				return null;
+			}
+
+			$body = $response->body();
+			if (!$body || strlen($body) === 0) {
+				return null;
+			}
+			$info = @getimagesizefromstring($body);
+			if (!$info || !isset($info[0], $info[1]) || $info[0] <= 0 || $info[1] <= 0) {
+				return null;
+			}
+			return $body;
+		} catch (\Exception $e) {
+			Log::warning('Image fetch failed: ' . $e->getMessage());
+			return null;
+		}
+	}
+
+	private function extractCategoryNames($categorys)
+	{
+		if (!is_string($categorys) || trim($categorys) === '') {
+			return [];
+		}
+
+		$normalized = str_replace(["\r\n", "\r", ","], "\n", $categorys);
+		$parts = explode("\n", $normalized);
+		$cleaned = [];
+
+		foreach ($parts as $part) {
+			$item = trim($part);
+			$item = preg_replace('/^[-*]\s*/', '', $item);
+			$item = trim($item);
+			if ($item !== '') {
+				$cleaned[] = $item;
+			}
+		}
+
+		return array_values(array_unique($cleaned));
+	}
+
+	private function resolveNewsCategory($categoryName)
+	{
+		$categoryName = trim((string) $categoryName);
+
+		if ($categoryName !== '') {
+			$category = Category::where('status', 1)->where('name', $categoryName)->first();
+			if ($category) {
+				return $category;
+			}
+
+			$category = Category::where('status', 1)
+				->whereRaw('LOWER(name) = ?', [strtolower($categoryName)])
+				->first();
+			if ($category) {
+				return $category;
+			}
+		}
+
+		$others = Category::where('status', 1)->where('name', 'Others')->first();
+		if ($others) {
+			return $others;
+		}
+
+		return Category::where('status', 1)
+			->where('name', '!=', 'Personalization')
+			->orderBy('id', 'ASC')
+			->first();
+	}
+
+
+	/**
+	 * Show Category view.
+	 *
+	 * @param  \Illuminate\Http\Request  $request
+	 * @return \Illuminate\Http\Response
+	 */
+	public function index(Request $request, $layout = 'side-menu', $theme = 'light')
+	{
+		$sources = [];
+		$sources_url = 'https://newsapi.org/v2/sources';
+		$sourcesfields = array(
+			'apiKey' => setting('news_api_key'),
+		);
+		$sources_url = $sources_url . '/?' . http_build_query($sourcesfields);
+		$ch = curl_init();
+		curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+		curl_setopt($ch, CURLOPT_URL, $sources_url);
+		curl_setopt($ch, CURLOPT_USERAGENT, 'PostmanRuntime/7.26.8');
+		$sources_result = curl_exec($ch);
+		curl_close($ch);
+		$sources_result = json_decode($sources_result, true);
+		if ($sources_result['status'] == 'ok') {
+			$sources = $sources_result['sources'];
+		}
+		$data = [];
+		if (isset($_GET['q']) && $_GET['q'] != '') {
+			$url = 'https://newsapi.org/v2/everything';
+			$fields = array(
+				'q' => $_GET['q'],
+				// 'from' => date('Y-m-d'),
+				'sortBy' => 'publishedAt',
+				'apiKey' => setting('news_api_key'),
+			);
+			if (isset($_GET['sources']) && $_GET['sources'] != '') {
+				$fields['sources'] = $_GET['sources'];
+			}
+
+			if (isset($_GET['domains']) && $_GET['domains'] != '') {
+				$fields['domains'] = $_GET['domains'];
+			}
+
+			if (isset($_GET['language']) && $_GET['language'] != '') {
+				$fields['language'] = $_GET['language'];
+			}
+
+			if (isset($_GET['from']) && $_GET['from'] != '') {
+				$fields['from'] = $_GET['from'];
+			}
+
+			if (isset($_GET['to']) && $_GET['to'] != '') {
+				$fields['to'] = $_GET['to'];
+			}
+
+			$url = $url . '/?' . http_build_query($fields);
+			$ch = curl_init();
+			curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+			curl_setopt($ch, CURLOPT_URL, $url);
+			curl_setopt($ch, CURLOPT_USERAGENT, 'PostmanRuntime/7.26.8');
+			$result = curl_exec($ch);
+			curl_close($ch);
+			$result = json_decode($result, true);
+			if ($result['status'] == 'ok') {
+				$data = $result['articles'];
+				// Example: Save all news in bulk (uncomment to enable)
+			}
+		}
+		if (isset($_GET['cat_name']) && $_GET['cat_name'] != '') {
+			$this->saveNewsApiPostsBulk($data, $_GET['cat_name']);
+		}
+		$news_api_language = config('constant.news_api_language');
+		return view('super-admin/news-api.index', [
+			'theme' => $theme,
+			'page_name' => 'index',
+			'side_menu' => array(),
+			'layout' => $layout,
+			'data' => $data,
+			'sources' => $sources,
+			'news_api_language' => $news_api_language,
+			'breadcrumb' => '<a href="' . url('/') . '" class="breadcrumb">' . trans("admin.dashboard") . '</a><i data-feather="chevron-right" class="breadcrumb__icon"></i><a href="' . url('/rss-feed-src/side-menu/light') . '" class="breadcrumb--active">' . trans("admin.news_api") . '</a>'
+
+		]);
+	}
+
+	/**
+	 * Method to save news api post
+	 * @param array $request
+	 */
+	public function saveNewsApiPost(Request $request)
+	{
+		try {
+			// Handle bulk posts (JSON array) from UI
+			if ($request->has('posts') && is_array($request->posts)) {
+				$results = $this->saveNewsApiPostsBulk($request->posts);
+				// summarize
+				$created = 0; $skipped = 0; $failed = 0;
+				foreach ($results as $r) {
+					if ($r['status'] == 'created') $created++;
+					elseif ($r['status'] == 'skipped') $skipped++;
+					else $failed++;
+				}
+				$message = [];
+				if ($created) $message[] = "$created added";
+				if ($skipped) $message[] = "$skipped skipped (already exists)";
+				if ($failed) $message[] = "$failed failed";
+				if (empty($message)) $message = ['No items processed'];
+				return response()->json(['success' => true, 'message' => implode(', ', $message), 'results' => $results]);
+			}
+			$category_list = Category::where('status', 1)->where('name', '!=', 'Personalization')->where('name', '!=', 'Others')->pluck('name')->toArray();
+
+			shuffle($category_list);
+			$categorys = "- " . implode("\n- ", $category_list);
+			$post = $request->all();
+			
+			// dd($categorys);
+			$post['urlToImage'] = strtok($post['urlToImage'], '?'); // clean image URL
+			$slug = \Helpers::createSlug($post['title'], 'blog', 0, false);
+			$existing = Blog::where('slug', $slug)
+				->orWhere('url', $post['url'])
+				->first();
+
+			if ($existing) {
+				// Optional: Log or notify duplicate
+				\Log::info('Duplicate news skipped: ' . $post['title']);
+				return redirect()->back()->with('success', 'News already exists, skipped duplicate.');
+			}
+
+			$cleanContent = preg_replace('/\s?\[\+\d+\schars\]$/', '', $post['content'] ?? '');
+			$datagpt = $this->processNewsArticle($post['title'], $cleanContent ?? '', $categorys);
+			$category = $this->resolveNewsCategory($datagpt['category'] ?? '');
+			// Insert blog
+			$inject = [
+				'slug' => $slug,
+				'title' => $datagpt['english_title'] ?? $post['title'],
+				'short_description' => $datagpt['english_description'] ?? $post['description'],
+				'url' => $post['url'],
+				'source_name' => $post['source'],
+				'source_published_at' => isset($post['publishedAt']) && $post['publishedAt'] != '' ? Carbon::parse($post['publishedAt'])->toDateTimeString() : null,
+				'description' => $datagpt['english_description'] ?? $post['description'],
+				'created_by' => Auth::user()->id,
+				'category_id' => $category ? $category->id : null,
+				'content_type' => 'text',
+				'schedule_date' => now(),
+				'status' => 2,
+				'blog_accent_code' => setting('blog_accent_code'),
+				'created_at' => now(),
+			];
+
+			$blog_id = Blog::insertGetId($inject);
+			BlogActionLog::record('blog_created', (int) $blog_id, Auth::check() ? (int) Auth::id() : null, [
+				'source' => 'news_api',
+				'status' => (int) ($inject['status'] ?? 0),
+				'ai_rewrite' => true,
+			]);
+			BlogActionLog::record('blog_translated', (int) $blog_id, Auth::check() ? (int) Auth::id() : null, [
+				'source' => 'news_api',
+				'languages' => ['en', 'hi'],
+			]);
+
+			if ($category) {
+				BlogCategory::create([
+					'category_id' => $category->id,
+					'blog_id' => $blog_id
+				]);
+			}
+
+			// Save translations
+			BlogTranslation::updateOrInsert(
+				['blog_id' => $blog_id, 'language_code' => 'en'],
+				[
+					'title' => $datagpt['english_title'] ?? $post['title'],
+					'description' => $datagpt['english_description'] ?? $post['description'],
+					'created_at' => now(),
+				]
+			);
+
+			BlogTranslation::updateOrInsert(
+				['blog_id' => $blog_id, 'language_code' => 'hi'],
+				[
+					'title' => $datagpt['hindi_title'] ?? $post['title'],
+					'description' => $datagpt['hindi_description'] ?? $cleanContent,
+					'created_at' => now(),
+				]
+			);
+			// Process image
+				// Process image: if no image, blocked image, or image is exactly 200x200, generate via OpenAI
+				try {
+					$fileUrl = isset($post['urlToImage']) ? strtok($post['urlToImage'], '?') : '';
+					$needsGenerated = empty($fileUrl);
+					$imageContent = $needsGenerated ? null : $this->fetchImageContentFromUrl($fileUrl);
+
+					// if (!$needsGenerated && $imageContent) {
+					// 	$info = @getimagesizefromstring($imageContent);
+					// 	if ($info && isset($info[0], $info[1]) && $info[0] == 200 && $info[1] == 200) {
+					// 		$needsGenerated = true;
+					// 	}
+					// }
+
+					// if ($needsGenerated || !$imageContent) {
+					// 	$this->generateAndSaveImageFromOpenAI($post['title'] ?? '', $post['description'] ?? $post['content'] ?? '', $blog_id);
+					// } else {
+						$ext = pathinfo($fileUrl, PATHINFO_EXTENSION) ?: 'jpg';
+						$name = time() . rand() . '.' . $ext;
+						$basePath = public_path('/upload/blog/banner/');
+						@mkdir($basePath . 'original/', 0755, true);
+						@mkdir($basePath . '800/', 0755, true);
+						@mkdir($basePath . '360/', 0755, true);
+						@mkdir($basePath . '200/', 0755, true);
+						$destination = $basePath . 'original/' . $name;
+
+						file_put_contents($destination, $imageContent);
+
+						$img = Image::make($destination);
+						$img->resize(800, null, function ($constraint) {
+							$constraint->aspectRatio();
+						})->save($basePath . '800/' . $name);
+						$img->resize(360, null, function ($constraint) {
+							$constraint->aspectRatio();
+						})->save($basePath . '360/' . $name);
+
+						BlogImages::insert([
+							'blog_id' => $blog_id,
+							'image' => $name,
+							'created_at' => now()
+						]);
+					// }
+				} catch (\Exception $e) {
+					Log::warning('Image processing check failed: ' . $e->getMessage());
+				}
+
+			return redirect()
+				->route('blog', ['layout' => 'side-menu', 'theme' => 'light'])
+				->with('success', __('message_alerts.success'));
+		} catch (\Exception $e) {
+			\Log::error('Blog Save Failed: ' . $e->getMessage());
+			return redirect()->back()->with('error', 'Something went wrong. Please try again.');
+		}
+	}
+
+
+	/**
+	 * Method to save multiple news api posts in bulk
+	 * @param array $posts
+	 */
+	public function saveNewsApiPostsBulk(array $posts, $cat_name = 'Social')
+	{
+		$category_list = Category::where('status', 1)->where('name', '!=', 'Personalization')->pluck('name')->toArray();
+		$categorys = implode(',', $category_list);
+		$userId = Auth::check() ? Auth::user()->id : 1;
+		$now = now();
+		$results = [];
+		foreach ($posts as $index => $post) {
+			$clientIdx = isset($post['idx']) ? $post['idx'] : $index;
+			try {
+				$post['urlToImage'] = isset($post['urlToImage']) ? strtok($post['urlToImage'], '?') : '';
+				$cleanContent = preg_replace('/\s?\[\+\d+\schars\]$/', '', $post['content'] ?? '');
+
+				$datagpt = $this->processNewsArticle($post['title'], $cleanContent, $categorys);
+
+				$slug = \Helpers::createSlug($post['title'], 'blog', 0, false);
+				$category = $this->resolveNewsCategory($datagpt['category'] ?? '');
+
+				// Skip if duplicate
+				$existing = Blog::where('url', $post['url'])->orWhere('slug', $slug)->first();
+				if ($existing) {
+					$results[] = ['idx' => $clientIdx, 'title' => $post['title'] ?? '', 'status' => 'skipped', 'message' => 'Already exists'];
+					continue;
+				}
+
+				$blog = Blog::create([
+					'slug' => $slug,
+					'title' => $datagpt['english_title'] ?? $post['title'],
+					'short_description' => $datagpt['english_description'] ?? $post['description'] ?? '',
+					'url' => $post['url'] ?? '',
+					'source_name' => is_array($post['source']) ? ($post['source']['name'] ?? '') : ($post['source'] ?? ''),
+					'description' => $datagpt['english_description'] ?? $post['content'] ?? '',
+					'created_by' => $userId,
+					'category_id' => $category->id ?? null,
+					'content_type' => 'text',
+					'schedule_date' => $now,
+					'status' => 2,
+					'blog_accent_code' => setting('blog_accent_code'),
+					'source_published_at' => isset($post['publishedAt']) && $post['publishedAt'] != '' ? Carbon::parse($post['publishedAt'])->toDateTimeString() : null,
+					'created_at' => $now,
+				]);
+
+				BlogActionLog::record('blog_created', (int) $blog->id, (int) $userId, [
+					'source' => 'news_api_bulk',
+					'status' => 2,
+					'ai_rewrite' => true,
+				]);
+				BlogActionLog::record('blog_translated', (int) $blog->id, (int) $userId, [
+					'source' => 'news_api_bulk',
+					'languages' => ['en', 'hi'],
+				]);
+
+				if ($category) {
+					BlogCategory::create(['category_id' => $category->id, 'blog_id' => $blog->id]);
+				}
+
+				BlogTranslation::updateOrInsert(
+					['blog_id' => $blog->id, 'language_code' => 'en'],
+					['title' => $datagpt['english_title'] ?? $post['title'], 'description' => $datagpt['english_description'] ?? $post['description'] ?? '', 'created_at' => $now]
+				);
+
+				BlogTranslation::updateOrInsert(
+					['blog_id' => $blog->id, 'language_code' => 'hi'],
+					['title' => $datagpt['hindi_title'] ?? $post['title'], 'description' => $datagpt['hindi_description'] ?? $post['content'] ?? '', 'created_at' => $now]
+				);
+
+				// Image handling (same as cron and single save)
+				$fileUrl = $post['urlToImage'] ?? '';
+				$basePath = public_path('/upload/blog/banner/');
+				$imageContent = $this->fetchImageContentFromUrl($fileUrl);
+				// $needsGenerated = empty($fileUrl) || !$imageContent;
+				// if (!$needsGenerated && $imageContent) {
+				// 	$info = @getimagesizefromstring($imageContent);
+				// 	if ($info && isset($info[0], $info[1]) && $info[0] == 200 && $info[1] == 200) {
+				// 		$needsGenerated = true;
+				// 	}
+				// }
+				// if ($needsGenerated) {
+				// 	$this->generateAndSaveImageFromOpenAI($post['title'] ?? '', $post['description'] ?? $post['content'] ?? '', $blog->id);
+				// } else {
+					$ext = \Helpers::get_file_extension($fileUrl) ?: 'jpg';
+					$name = time() . rand() . '.' . $ext;
+					@mkdir($basePath . 'original/', 0755, true);
+					@mkdir($basePath . '800/', 0755, true);
+					@mkdir($basePath . '360/', 0755, true);
+					@mkdir($basePath . '200/', 0755, true);
+					$destination = $basePath . 'original/' . $name;
+					file_put_contents($destination, $imageContent);
+					$img = Image::make($destination);
+					$img->resize(800, null, function ($constraint) {
+						$constraint->aspectRatio();
+					})->save($basePath . '800/' . $name);
+					$img->resize(360, null, function ($constraint) {
+						$constraint->aspectRatio();
+					})->save($basePath . '360/' . $name);
+					$img->fit(200, 200)->save($basePath . '200/' . $name);
+					BlogImages::insertGetId(['blog_id' => $blog->id, 'image' => $name, 'created_at' => $now]);
+				// }
+					$results[] = ['idx' => $clientIdx, 'title' => $post['title'] ?? '', 'status' => 'created', 'blog_id' => $blog->id];
+				} catch (\Exception $e) {
+					Log::warning('Bulk save failed for article: ' . ($post['title'] ?? '') . ' - ' . $e->getMessage());
+					$results[] = ['idx' => $clientIdx, 'title' => $post['title'] ?? '', 'status' => 'failed', 'message' => $e->getMessage()];
+					continue;
+				}
+		}
+		return $results;
+	}
+
+	public function runCronNews()
+	{
+		// Optional: secure your route
+		// if (request('token') !== env('CRON_SECRET')) abort(403);
+		$category_list = Category::where('status', 1)->where('name', '!=', 'Personalization')->pluck('name')->toArray();
+		$categorys = implode(',', $category_list);
+		// dd($categorys);
+		$fromTime = Carbon::now()->subMinutes(1450)->toIso8601String();
+		$toTime = Carbon::now()->toIso8601String();
+		$apiKey = setting('news_api_key');
+		$url = 'https://newsapi.org/v2/everything';
+
+		$fields = [
+			'q' => 'a',
+			'from' => $fromTime,
+			'to' => $toTime,
+			'sortBy' => 'publishedAt',
+			'language' => 'en',
+			'apiKey' => $apiKey
+		];
+
+		$url = $url . '?' . http_build_query($fields);
+
+		$ch = curl_init();
+		curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+		curl_setopt($ch, CURLOPT_URL, $url);
+		curl_setopt($ch, CURLOPT_USERAGENT, 'PostmanRuntime/7.26.8');
+		$result = curl_exec($ch);
+		curl_close($ch);
+
+		$result = json_decode($result, true);
+
+		if ($result['status'] !== 'ok') {
+			Log::error('News API fetch failed: ' . json_encode($result));
+			return 'Failed to fetch news.';
+		}
+
+		$articles = $result['articles'];
+		$createdBy = Auth::check() ? Auth::user()->id : 1; // fallback to admin user
+
+		// Example: assign all fetched news to a default category
+		$categoryId = 1; // change to real default category id if needed
+		$test = 0;
+		foreach ($articles as $article) {
+			$test++;
+			$cleanContent = preg_replace('/\s?\[\+\d+\schars\]$/', '', $article['content'] ?? '');
+			$datagpt = $this->processNewsArticle($article['title'], $cleanContent ?? '', $categorys);
+
+			$slug = \Helpers::createSlug($article['title'], 'blog', 0, false);
+			$category = $this->resolveNewsCategory($datagpt['category'] ?? '');
+			$existingBlog = Blog::where('url', $article['url'])->orWhere('slug', $slug)->first();
+
+			if (!$existingBlog) {
+				$blog = Blog::create([
+					'slug' => $slug,
+					'title' => $datagpt['english_title'] ?? $article['title'],
+					'short_description' => $article['description'] ?? '',
+					'url' => $article['url'],
+					'source_name' => $article['source']['name'] ?? '',
+					'description' => $datagpt['english_description'] ?? $article['content'],
+					'created_by' => $createdBy,
+					'category_id' => $category ? $category->id : null,
+					'content_type' => 'text',
+					'schedule_date' => now(),
+					'status' => 2,
+					'blog_accent_code' => setting('blog_accent_code'),
+					'created_at' => now(),
+				]);
+
+				BlogActionLog::record('blog_created', (int) $blog->id, (int) $createdBy, [
+					'source' => 'news_api_cron',
+					'status' => 2,
+					'ai_rewrite' => true,
+				]);
+				BlogActionLog::record('blog_translated', (int) $blog->id, (int) $createdBy, [
+					'source' => 'news_api_cron',
+					'languages' => ['en', 'hi'],
+				]);
+
+
+				if ($category) {
+					$blogCat = new BlogCategory();
+					$blogCat['category_id'] = $category->id;
+					$blogCat['blog_id'] = $blog->id;
+					$blogCat->save();
+				}
+				// Translation
+				BlogTranslation::updateOrInsert(
+					['blog_id' => $blog->id, 'language_code' => 'en'],
+					[
+						'title' => $datagpt['english_title'] ?? $article['title'],
+						'description' => $datagpt['english_description'] ?? $article['english_description'],
+						'created_at' => now(),
+					]
+				);
+				BlogTranslation::updateOrInsert(
+					['blog_id' => $blog->id, 'language_code' => 'hi'],
+					[
+						'title' => $datagpt['hindi_title'] ?? $article['title'],
+						'description' => $datagpt['hindi_description'] ?? $article['content'],
+						'created_at' => now(),
+					]
+				);
+
+				// Image Save
+					$fileUrl = isset($article['urlToImage']) ? strtok($article['urlToImage'], '?') : '';
+					$basePath = public_path('/upload/blog/banner/');
+					$imageContent = $this->fetchImageContentFromUrl($fileUrl);
+					$needsGenerated = empty($fileUrl) || !$imageContent;
+					// if (!$needsGenerated && $imageContent) {
+					// 	$info = @getimagesizefromstring($imageContent);
+					// 	if ($info && isset($info[0], $info[1]) && $info[0] == 200 && $info[1] == 200) {
+					// 		$needsGenerated = true;
+					// 	}
+					// }
+					// if ($needsGenerated) {
+					// 	$this->generateAndSaveImageFromOpenAI($article['title'] ?? '', $article['description'] ?? $article['content'] ?? '', $blog->id);
+					// } else {
+						$ext = pathinfo($fileUrl, PATHINFO_EXTENSION) ?: 'jpg';
+						$name = time() . rand() . '.' . $ext;
+						@mkdir($basePath . 'original/', 0755, true);
+						@mkdir($basePath . '800/', 0755, true);
+						@mkdir($basePath . '360/', 0755, true);
+						@mkdir($basePath . '200/', 0755, true);
+						$destination = $basePath . 'original/' . $name;
+						file_put_contents($destination, $imageContent);
+						$img = Image::make($destination);
+						$img->resize(800, null, function ($constraint) {
+							$constraint->aspectRatio();
+						})->save($basePath . '800/' . $name);
+						$img->resize(360, null, function ($constraint) {
+							$constraint->aspectRatio();
+						})->save($basePath . '360/' . $name);
+						$img->fit(200, 200)->save($basePath . '200/' . $name);
+						BlogImages::insert([
+							'blog_id' => $blog->id,
+							'image' => $name,
+							'created_at' => now()
+						]);
+					// }
+			}
+			// print_r($datagpt);
+			if ($test > 10) {
+				die("News article processed: " . $article['title']);
+			}
+		}
+
+		return 'Fetched and saved ' . count($articles) . ' articles.';
+	}
+
+	public function processNewsArticle($title, $description, $categorys)
+	{
+		  $max_words = SiteContent::where('key', 'news_max_words')->first()->value ?? 60;
+		  $min_words = $max_words - 10;
+	$allowedCategories = $this->extractCategoryNames($categorys);
+	$prompt = <<<EOT
+You are a precise and creative AI assistant that classifies and rewrites news content.
+
+Follow these instructions carefully and return **only valid JSON**.
+
+---
+
+### Step 1: Category Selection  
+From the list below, choose **exactly one** category that best matches the article.  
+Categories: $categorys
+If no listed category is suitable, return category as exactly "Others".
+
+### Step 2: English Rewrite  
+- Rewrite the news title in a **positive, professional** tone using **exactly 15 words**.  
+- Rewrite the news description in the same tone using **between $min_words and $max_words words**, but absolutely **do not exceed $max_words words**.  
+- Keep the meaning accurate, clear, and engaging. Avoid generic phrases.  
+- Avoid repetitive emotional terms and avoid using the same word/root twice in the title.  
+- Do **not** use “joy”, “joyful”, “exciting”, “excited”, “exciting news”, or similar hype words.  
+- Do **not** start the title with phrases like “Exciting News!”, “Breaking News!”, or “Good News!”.
+
+### Step 3: Hindi Translation  
+Translate both rewritten English parts into **Hindi** while keeping the tone and clarity the same.  
+- Hindi title: 15 words  
+- Hindi description: between $min_words and $max_words words  
+
+---
+
+Return **only** this JSON object (no explanations or extra text):
+{
+  "category": "chosen category name",
+  "english_title": "15-word rewritten English title",
+  "english_description": "rewritten English description (between $min_words and $max_words words)",
+  "hindi_title": "15-word Hindi title",
+  "hindi_description": "Hindi description (between $min_words and $max_words words)"
+}
+
+---
+
+### Example:
+News Title: Google unveils new AI tool for education.  
+News Description: Google has announced a new AI tool aimed at helping students learn faster and more efficiently. The tool will be released globally next month.
+
+---
+
+### Now process this:
+News Title: $title  
+News Description: $description
+EOT;
+
+		$response = Http::withToken(env('chatgpt_key'))->post('https://api.openai.com/v1/chat/completions', [
+			'model' => env('OPENAI_MODEL', 'gpt-4o-mini'), // Consider upgrading if available
+			'messages' => [
+				['role' => 'user', 'content' => $prompt]
+			]
+		]);
+
+		if ($response->failed()) {
+			$payload = $response->json() ?: $response->body();
+			\Helpers::markOpenAiQuotaExpiredIfNeeded($payload);
+
+			$fallbackCategory = 'Others';
+
+			return [
+				'category' => $fallbackCategory,
+				'english_title' => $title,
+				'english_description' => $description,
+				'hindi_title' => $title,
+				'hindi_description' => $description,
+			];
+		}
+
+		\Helpers::clearOpenAiQuotaExpired();
+
+		$output = trim($response['choices'][0]['message']['content'] ?? '');
+
+		// Try to decode the JSON response
+		$data = json_decode($output, true);
+
+		if (json_last_error() === JSON_ERROR_NONE && is_array($data)) {
+			$chosenCategory = trim((string) ($data['category'] ?? ''));
+			$allowedLower = array_map('strtolower', $allowedCategories);
+			$isAllowed = $chosenCategory !== '' && in_array(strtolower($chosenCategory), $allowedLower, true);
+
+			if (!$isAllowed) {
+				$data['category'] = 'Others';
+			}
+
+			$data['english_title'] = $data['english_title'] ?? $title;
+			$data['english_description'] = $data['english_description'] ?? $description;
+			$data['hindi_title'] = $data['hindi_title'] ?? $title;
+			$data['hindi_description'] = $data['hindi_description'] ?? $description;
+
+			return $data;
+		}
+
+		// Fallback: return raw output for debugging
+		return [
+			'raw_output' => $output,
+			'category' => 'Others',
+			'english_title' => $title,
+			'english_description' => $description,
+			'hindi_title' => $title,
+			'hindi_description' => $description,
+		];
+	}
+}

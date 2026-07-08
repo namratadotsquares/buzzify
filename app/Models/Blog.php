@@ -1,0 +1,1183 @@
+<?php
+
+
+
+namespace App\Models;
+
+
+
+use Illuminate\Database\Eloquent\Model;
+
+use Illuminate\Database\Eloquent\SoftDeletes;
+
+use Illuminate\Support\Facades\DB;
+
+use Auth;
+
+use App\Models\BlogTranslation;
+
+use App\Models\CategoryTranslation;
+
+use App\Models\Category;
+
+use App\Models\BlogCategory;
+
+
+
+class Blog extends Model
+{
+
+    protected $table = "blog";
+
+    protected $dates = ['deleted_at'];
+
+
+
+    protected $fillable = [
+        'slug',
+        'title',
+        'short_description',
+        'url',
+        'source_name',
+        'description',
+        'created_by',
+        'category_id',
+        'content_type',
+        'schedule_date',
+        'status',
+        'source_published_at',
+        'blog_accent_code',
+        'created_at',
+
+        // additional from your original list
+
+        'longitude',
+        'is_location_radius',
+        'source_name',
+        'latitude',
+        'swipe_text',
+        'blog_code'
+
+    ];
+
+
+
+    // public function category()
+    // {
+
+    //     return $this->hasOne('App\Models\Category', "id", "category_id")->where('status', 1);
+
+    //     //->where('status',1)
+
+    // }
+    public function category()
+    {
+        return $this->hasOne('App\Models\Category', "id", "category_id")
+            ->where('status', 1);
+    }
+
+
+    public function viewStories()
+    {
+        return $this->hasMany('App\Models\StoreViewed', 'blog_id', 'id');
+    }
+
+    public function blog_category()
+    {
+
+        return $this->hasMany('App\Models\BlogCategory', "blog_id", "id")->with('category');
+
+        //->where('status',1)
+
+    }
+
+
+
+    public function image()
+    {
+
+        return $this->hasOne('App\Models\BlogImages', "blog_id", "id");
+    }
+
+
+
+    public function author()
+    {
+
+        return $this->hasOne('App\Models\Author', "id", "author_id");
+
+        //->where('status',1)
+
+    }
+
+
+
+
+
+    /**
+
+     * Upadte Blog
+
+     * @param Array of post data
+
+     * @return template_id
+
+     */
+
+    public static function updateBlog($data)
+    {
+
+        try {
+
+            $template = new self;
+
+            $id = 0;
+
+            if ($id = $template->where('id', $data['id'])->update($data)) {
+
+                return ['status' => true, 'message' => "Blog updated sucessfully", 'id' => $id];
+            } else {
+
+                return ['status' => false, 'message' => "Error in updating blog"];
+            }
+        } catch (\Exception $e) {
+
+            return ['status' => false, 'message' => $e->getMessage() . ' ' . $e->getLine() . ' ' . $e->getFile()];
+        }
+    }
+
+
+
+    /**
+
+     * Get All Blog
+
+     * @param Search data
+
+     * @return array 
+
+     */
+
+    public static function getAllBlog($search = '')
+    {
+
+        try {
+
+            $contact = new self;
+
+            $pagination_no = 25;
+
+            $blogIdArr = array();
+
+            if (isset($search['per_page']) && !empty($search['per_page'])) {
+
+                $pagination_no = $search['per_page'];
+            }
+
+            if (isset($search['post']) && $search['post'] != '') {
+
+                if ($search['post'] == 'publish') {
+
+                    $contact = $contact->where('status', 1);
+                } else if ($search['post'] == 'unpublish') {
+
+                    $contact = $contact->where('status', 0);
+                } else if ($search['post'] == 'draft') {
+
+                    $contact = $contact->where('status', 2);
+                }
+            }
+
+
+
+            if (isset($search['name']) && $search['name'] != '') {
+                $keyword = $search['name'];
+                $contact = $contact->where(function ($q) use ($keyword) {
+                    $q->where(DB::raw('LOWER(title)'), 'like', '%' . strtolower($keyword) . '%');
+                    $q->orWhere('blog_code', 'like', '%' . $keyword . '%');
+                });
+            }
+
+
+
+            //if(isset($search['category_id']) && $search['category_id'] != ''){
+
+            //$contact = $contact->where('category_id',$search['category_id']);
+
+            //}
+
+
+
+            if (isset($search['category_id']) && $search['category_id'] != '') {
+
+                //   $contact = $contact->where('category_id',$search['category_id']);
+
+                $blogcategory = BlogCategory::where('category_id', $search['category_id'])->get();
+
+                if (count($blogcategory)) {
+
+                    foreach ($blogcategory as $blogcategory_data) {
+
+                        array_push($blogIdArr, $blogcategory_data->blog_id);
+                    }
+                }
+            }
+
+            if (count($blogIdArr) > 0) {
+
+                $contact = $contact->whereIn('id', $blogIdArr);
+            }
+
+
+
+            if (isset($search['status']) && $search['status'] != '') {
+                if ($search['status'] === 'scheduled') {
+                    $contact = $contact->where('status', 1)->where('schedule_date', '>', date("Y-m-d H:i:s"));
+                } else if ($search['status'] == '1') {
+                    $contact = $contact->where('status', 1)->where(function ($q) {
+                        $q->whereNull('schedule_date')->orWhere('schedule_date', '<=', date("Y-m-d H:i:s"));
+                    });
+                } else {
+                    $contact = $contact->where('status', $search['status']);
+                }
+            }
+
+
+
+            if (isset($search['from_date']) && $search['from_date'] != '' && $search['to_date'] != '') {
+
+                $search['to_date'] = date("Y-m-d h:i:s", strtotime($search['to_date'] . " 23:59:59"));
+
+                $contact = $contact->where('created_at', '>=', $search['from_date'])->where('created_at', '<=', $search['to_date']);
+            } else if (isset($search['from_date']) && $search['from_date'] != '') {
+
+                $contact = $contact->where('created_at', '>=', $search['from_date']);
+            } else if (isset($search['to_date']) && $search['to_date'] != '') {
+
+                $search['to_date'] = date("Y-m-d h:i:s", strtotime($search['to_date'] . " 23:59:59"));
+
+                $contact = $contact->where('created_at', '<=', $search['to_date']);
+            }
+
+            if (isset($search['visibility']) && $search['visibility'] != '') {
+                if ($search['visibility'] == 'featured') {
+                    $contact = $contact->where('is_featured', 1);
+                } else if ($search['visibility'] == 'slider') {
+                    $contact = $contact->where('is_slider', 1);
+                } else if ($search['visibility'] == 'editor_picks') {
+                    $contact = $contact->where('is_editor_picks', 1);
+                } else if ($search['visibility'] == 'weekly_top_picks') {
+                    $contact = $contact->where('is_weekly_top_picks', 1);
+                }
+            }
+
+
+
+            $data = $contact->orderBy('id', 'DESC')->with('category')->with('image')->with('blog_category')->paginate($pagination_no)->appends('per_page', $pagination_no);
+
+            foreach ($data as $likes) {
+
+                $blogCategoryName = array();
+
+                $likes->likes = Vote::where('blog_id', $likes->id)->get();
+
+                $likes->viewcount = BlogViewCount::where('blog_id', $likes->id)->count();
+
+                $img = BlogImages::where('blog_id', $likes->id)->orderBy('id', 'DESC')->first();
+
+                $user = User::where('id', $likes->created_by)->orderBy('id', 'DESC')->first();
+
+                if ($user) {
+
+                    if ($user->type == 'admin') {
+
+                        $likes->created_by_name = "SuperAdmin";
+                    } else {
+
+                        $likes->created_by_name = $user->name;
+                    }
+                } else {
+
+                    $likes->created_by_name = "--";
+                }
+
+                if ($img) {
+
+                    $likes->blog_image = url('upload/blog/banner/360/' . $img->image);
+                } else {
+
+                    $likes->blog_image = "";
+                }
+
+                if (isset($likes->blog_category) && count($likes->blog_category)) {
+
+                    foreach ($likes->blog_category as $blog_category) {
+
+                        if (isset($blog_category->category) && $blog_category->category != '') {
+
+                            array_push($blogCategoryName, $blog_category->category->name);
+                        }
+                    }
+                }
+
+                $likes->blog_category_data = BlogCategory::where('blog_id', $likes->id)->with('category')->first();
+
+
+
+                if (count($blogCategoryName) > 0) {
+
+                    $likes->blog_category_name = implode(", ", $blogCategoryName);
+                }
+            }
+
+
+
+            // dd($data);
+
+            return $data;
+        } catch (\Exception $e) {
+
+            return ['status' => false, 'message' => $e->getMessage() . ' ' . $e->getLine() . ' ' . $e->getFile()];
+        }
+    }
+
+
+
+    /**
+
+     * Get All Blog
+
+     * @param Search data
+
+     * @return array 
+
+     */
+
+    public static function getAllSliderBlog($search = '')
+    {
+
+        try {
+
+            $contact = new self;
+
+            $pagination_no = 30;
+
+            if (isset($search['per_page']) && !empty($search['per_page'])) {
+
+                $pagination_no = $search['per_page'];
+            }
+
+            if (isset($search['post']) && $search['post'] != '') {
+
+                if ($search['post'] == 'publish') {
+
+                    $contact = $contact->where('status', 1);
+                } else if ($search['post'] == 'unpublish') {
+
+                    $contact = $contact->where('status', 0);
+                } else if ($search['post'] == 'draft') {
+
+                    $contact = $contact->where('status', 2);
+                }
+            }
+
+
+
+            if (isset($search['name']) && $search['name'] != '') {
+
+                $keyword = $search['name'];
+
+                $contact = $contact->where(function ($q) use ($keyword) {
+
+                    $q->where(DB::raw('LOWER(title)'), 'like', '%' . strtolower($keyword) . '%');
+                });
+            }
+
+
+
+            $data = $contact->where('is_slider', 1)->orderBy('order', 'ASC')->with('category')->with('image')->paginate($pagination_no)->appends('per_page', $pagination_no);
+
+            foreach ($data as $likes) {
+
+                $likes->likes = Vote::where('blog_id', $likes->id)->get();
+
+                $likes->viewcount = BlogViewCount::where('blog_id', $likes->id)->count();
+
+                $img = BlogImages::where('blog_id', $likes->id)->orderBy('id', 'DESC')->first();
+
+                $user = User::where('id', $likes->created_by)->orderBy('id', 'DESC')->first();
+
+                $likes->blog_category_data = BlogCategory::where('blog_id', $likes->id)->with('category')->first();
+
+
+
+                if ($user) {
+
+                    if ($user->type == 'admin') {
+
+                        $likes->created_by_name = "SuperAdmin";
+                    } else {
+
+                        $likes->created_by_name = $user->name;
+                    }
+                } else {
+
+                    $likes->created_by_name = "--";
+                }
+
+                if ($img) {
+
+                    $likes->blog_image = url('upload/blog/banner/original/' . $img->image);
+                } else {
+
+                    $likes->blog_image = "";
+                }
+            }
+
+            return $data;
+        } catch (\Exception $e) {
+
+            return ['status' => false, 'message' => $e->getMessage() . ' ' . $e->getLine() . ' ' . $e->getFile()];
+        }
+    }
+
+
+
+    /**
+
+     * Get All Blog
+
+     * @param Search data
+
+     * @return array 
+
+     */
+
+    public static function getAllActiveBlog($search = '')
+    {
+
+        try {
+
+            $blog = new self;
+
+            $pagination_no = 10;
+
+            if (isset($search['per_page']) && !empty($search['per_page'])) {
+
+                $pagination_no = $search['per_page'];
+            }
+
+            $data = $blog->where('status', 1)->orderBy('id', 'DESC')
+
+                ->paginate($pagination_no)->appends('per_page', $pagination_no);
+
+            return $data;
+        } catch (\Exception $e) {
+
+            return ['status' => false, 'message' => $e->getMessage() . ' ' . $e->getLine() . ' ' . $e->getFile()];
+        }
+    }
+
+
+
+    /**
+
+     * Get All Blog
+
+     * @param Search data
+
+     * @return array 
+
+     */
+
+    public static function getAllActiveBlogForDash($search = '')
+    {
+
+        try {
+
+            $blog = new self;
+
+            $data = $blog->where('status', 1)->orderBy('id', 'DESC')
+
+                ->get();
+
+            return $data;
+        } catch (\Exception $e) {
+
+            return ['status' => false, 'message' => $e->getMessage() . ' ' . $e->getLine() . ' ' . $e->getFile()];
+        }
+    }
+
+
+
+    /**
+
+     * Get All Blog Details
+
+     * @param blog id
+
+     * @return object 
+
+     */
+
+    public static function getActiveBlogDetail($id)
+    {
+
+        try {
+
+            $blog = new self;
+
+            $data = $blog->where('id', $id)->first();
+
+            return $data;
+        } catch (\Exception $e) {
+
+            return ['status' => false, 'message' => $e->getMessage() . ' ' . $e->getLine() . ' ' . $e->getFile()];
+        }
+    }
+
+
+
+    /**
+
+     * Get All Blog
+
+     * @param Search data
+
+     * @return array 
+
+     */
+
+    public static function frontBlog($type, $limit)
+    {
+
+        try {
+
+            $catslug = (isset($_GET['category'])) ? ($_GET['category'] != '') ? $_GET['category'] : '' : '';
+
+            $contact = new self;
+
+            $contact = $contact->where('status', 1)->where('schedule_date', "<=", date("Y-m-d H:i:s"))->with('category')->with('image')->with('author');
+
+            if ($catslug != '') {
+
+                $category = Category::where('status', 1)->where('slug', $catslug)->first();
+
+                if ($category) {
+
+                    $contact = $contact->where('category_id', $category->id);
+                }
+            }
+
+            if ($type == 'slider') {
+
+                $contact = $contact->where('is_slider', 1)->orderBy('order', 'ASC');
+            } else if ($type == 'editor') {
+
+                $contact = $contact->where('is_editor_picks', 1)->orderBy('schedule_date', 'DESC');
+            } else if ($type == 'top_of_week') {
+
+                $contact = $contact->where('is_weekly_top_picks', 1)->orderBy('schedule_date', 'DESC');
+            } else {
+
+                $contact = $contact->orderBy('schedule_date', 'DESC');
+            }
+
+            $data = $contact->limit($limit)->get();
+
+            $language = \Helpers::returnUserLangCode();
+
+            $finalResponse = array();
+
+            foreach ($data as $likes) {
+
+                $likes->post_show = false;
+
+                $blogTranslate = BlogTranslation::where('blog_id', $likes->id)->where('language_code', $language)->first();
+
+                if ($blogTranslate) {
+
+                    $likes->post_show = true;
+
+                    $likes->title = $blogTranslate->title;
+
+                    $likes->tags = $blogTranslate->tags;
+
+                    $likes->description = $blogTranslate->description;
+
+                    $likes->seo_title = $blogTranslate->seo_title;
+
+                    $likes->seo_keyword = $blogTranslate->seo_keyword;
+
+                    $likes->seo_tag = $blogTranslate->seo_tag;
+
+                    $likes->seo_description = $blogTranslate->seo_description;
+                }
+
+
+
+                if ($likes->category) {
+
+                    $catTranslate = CategoryTranslation::where('category_id', $likes->category->id)->where('language_code', $language)->first();
+
+                    if ($catTranslate) {
+
+                        $likes->category->name = $catTranslate->name;
+                    }
+                }
+
+
+
+                $likes->blog_category_data = BlogCategory::where('blog_id', $likes->id)->with('category')->first();
+
+                $likes->likes = Vote::where('blog_id', $likes->id)->get();
+
+                $likes->viewcount = BlogViewCount::where('blog_id', $likes->id)->count();
+
+                $img = BlogImages::where('blog_id', $likes->id)->orderBy('id', 'DESC')->first();
+
+                $user = User::where('id', $likes->created_by)->first();
+
+                if ($user) {
+
+                    if ($user->type == 'admin') {
+
+                        $likes->created_by_name = "SuperAdmin";
+                    } else {
+
+                        $likes->created_by_name = $user->name;
+                    }
+                } else {
+
+                    $likes->created_by_name = "--";
+                }
+
+                if ($img) {
+
+                    $likes->blog_image = $img->image;
+                }
+
+                if ($likes->post_show) {
+
+                    array_push($finalResponse, $likes);
+                }
+
+
+
+                $url = $likes->url;
+
+                $pieces = parse_url($url);
+
+                $domain = isset($pieces['host']) ? $pieces['host'] : $pieces['path'];
+
+                if (preg_match('/(?P<domain>[a-z0-9][a-z0-9\-]{1,63}\.[a-z\.]{2,6})$/i', $domain, $regs)) {
+
+                    $likes->url_host = $regs['domain'];
+                }
+            }
+
+            return $finalResponse;
+        } catch (\Exception $e) {
+
+            return ['status' => false, 'message' => $e->getMessage() . ' ' . $e->getLine() . ' ' . $e->getFile()];
+        }
+    }
+
+
+
+    /**
+
+     * Get All Blog
+
+     * @param Search data
+
+     * @return array 
+
+     */
+
+    public static function getBlogDetail($slug)
+    {
+
+        try {
+
+            $contact = new self;
+
+            $flag = true;
+
+            $data = $contact->where('status', 1)->where('schedule_date', "<=", date("Y-m-d H:i:s"))->where('slug', $slug)->with('category')->with('image')->with('author')->with('blog_category')->first();
+
+            if ($data) {
+
+                $blogCategoryIdArr = array();
+
+                $blogCategoryNameArr = array();
+
+                $data->likes = Vote::where('blog_id', $data->id)->get();
+
+                $data->viewcount = BlogViewCount::where('blog_id', $data->id)->count();
+
+                if (Auth::user()) {
+
+                    $bookmark = BookMarkPost::where('blog_id', $data->id)->where('user_id', Auth::user()->id)->first();
+
+
+
+                    if ($bookmark) {
+
+                        $data->isBookmarked = 1;
+                    } else {
+
+                        $data->isBookmarked = 0;
+                    }
+                } else {
+
+                    $data->isBookmarked = 0;
+                }
+
+                $img = BlogImages::where('blog_id', $data->id)->orderBy('id', 'DESC')->first();
+
+                $data->blog_image = '';
+
+                if ($img) {
+
+                    $data->blog_image = $img->image;
+                }
+
+                $language = \Helpers::returnUserLangCode();
+
+
+
+                $blogTranslate = BlogTranslation::where('blog_id', $data->id)->where('language_code', $language)->first();
+
+                if ($blogTranslate) {
+
+                    $data->title = $blogTranslate->title;
+
+                    $data->tags = $blogTranslate->tags;
+
+                    $data->description = $blogTranslate->description;
+
+                    $data->seo_title = $blogTranslate->seo_title;
+
+                    $data->seo_keyword = $blogTranslate->seo_keyword;
+
+                    $data->seo_tag = $blogTranslate->seo_tag;
+
+                    $data->seo_description = $blogTranslate->seo_description;
+                } else {
+
+                    $flag = false;
+                }
+
+                if ($data->category) {
+
+                    $catTranslate = CategoryTranslation::where('category_id', $data->category->id)->where('language_code', $language)->first();
+
+                    if ($catTranslate) {
+
+                        $data->category->name = $catTranslate->name;
+                    }
+                }
+
+                if ($data->blog_category) {
+
+                    $blog_category = BlogCategory::where('blog_id', $data->id)->get();
+
+                    if (count($blog_category)) {
+
+                        foreach ($blog_category as $blog_category_data) {
+
+                            if (isset($blog_category_data->category) && $blog_category_data->category != '') {
+
+                                array_push($blogCategoryIdArr, $blog_category_data->category->id);
+
+                                array_push($blogCategoryNameArr, $blog_category_data->category->name);
+                            }
+                        }
+                    }
+                }
+
+                $data->blog_category_data = BlogCategory::where('blog_id', $data->id)->with('category')->first();
+
+                if (count($blogCategoryNameArr) > 0) {
+
+                    $data->blog_category_name = implode(",", $blogCategoryNameArr);
+                }
+
+                if (count($blogCategoryIdArr) > 0) {
+
+                    $data->blog_category_id = $blogCategoryIdArr;
+
+                    $data->blog_category_id_string = implode(",", $blogCategoryIdArr);
+                }
+
+                if ($data->tags != '') {
+
+                    $data->tags = explode(",", $data->tags);
+                }
+
+                if ($data->url != '') {
+
+                    $url = $data->url;
+
+                    $pieces = parse_url($url);
+
+                    $domain = isset($pieces['host']) ? $pieces['host'] : $pieces['path'];
+
+                    if (preg_match('/(?P<domain>[a-z0-9][a-z0-9\-]{1,63}\.[a-z\.]{2,6})$/i', $domain, $regs)) {
+
+                        $data->url_host = $regs['domain'];
+                    }
+                }
+            }
+
+
+
+            if ($flag) {
+
+                return $data;
+            } else {
+
+                return $flag;
+            }
+        } catch (\Exception $e) {
+
+            return ['status' => false, 'message' => $e->getMessage() . ' ' . $e->getLine() . ' ' . $e->getFile()];
+        }
+    }
+
+
+
+    public static function getSingleBlog($id)
+    {
+
+        try {
+
+            $contact = new self;
+
+            $data = $contact->where('id', $id)->with('category')->with('image')->with('author')->first();
+
+            if ($data) {
+
+                $language = \Helpers::returnUserLangCode();
+
+                $blogTranslate = BlogTranslation::where('blog_id', $data->id)->where('language_code', $language)->first();
+
+                if ($blogTranslate) {
+
+                    $data->title = $blogTranslate->title;
+
+                    $data->tags = $blogTranslate->tags;
+
+                    $data->description = $blogTranslate->description;
+
+                    $data->seo_title = $blogTranslate->seo_title;
+
+                    $data->seo_keyword = $blogTranslate->seo_keyword;
+
+                    $data->seo_tag = $blogTranslate->seo_tag;
+
+                    $data->seo_description = $blogTranslate->seo_description;
+                }
+
+                if ($data->category) {
+
+                    $catTranslate = CategoryTranslation::where('category_id', $data->category->id)->where('language_code', $language)->first();
+
+                    if ($catTranslate) {
+
+                        $data->category->name = $catTranslate->name;
+                    }
+                }
+
+                $data->blog_category_data = BlogCategory::where('blog_id', $data->id)->with('category')->first();
+
+                if ($data->tags != '') {
+
+                    $data->tags = explode(",", $data->tags);
+                }
+
+                $data->likes = Vote::where('blog_id', $data->id)->get();
+
+                $data->viewcount = BlogViewCount::where('blog_id', $data->id)->count();
+
+                $img = BlogImages::where('blog_id', $data->id)->orderBy('id', 'DESC')->first();
+
+                if ($img) {
+
+                    $data->blog_image = $img->image;
+                }
+            }
+
+            return $data;
+        } catch (\Exception $e) {
+
+            return ['status' => false, 'message' => $e->getMessage() . ' ' . $e->getLine() . ' ' . $e->getFile()];
+        }
+    }
+
+
+
+    /**
+
+     * Get All Blog
+
+     * @param Search data
+
+     * @return array 
+
+     */
+
+    public static function getRelatedBlog($blogid = '', $category_id = '', $limit = 4)
+    {
+
+        try {
+
+            $contact = new self;
+
+            if (isset($blogid) && $blogid != '') {
+
+                $contact = $contact->where('id', '!=', $blogid);
+            }
+
+
+
+            if (isset($category_id) && $category_id != '') {
+
+                $blog_id_arr = array();
+
+                $blog_cat = BlogCategory::whereIn('category_id', $category_id)->get();
+
+                if (count($blog_cat)) {
+
+                    foreach ($blog_cat as $blog_cat_data) {
+
+                        if ($blog_cat_data->blog_id != $blogid) {
+
+                            array_push($blog_id_arr, $blog_cat_data->blog_id);
+                        }
+                    }
+                }
+
+                //echo json_encode($blog_cat);exit;
+
+                $contact = $contact->whereIn('id', $blog_id_arr);
+            }
+
+
+
+            if (isset($limit) && $limit != '') {
+
+                $contact = $contact->limit($limit);
+            }
+
+            $data = $contact->where('status', 1)->where('schedule_date', "<=", date("Y-m-d H:i:s"))->orderBy('id', 'DESC')->with('category')->with('image')->with('author')->get();
+
+            foreach ($data as $likes) {
+
+                $likes->post_show = false;
+
+                $language = \Helpers::returnUserLangCode();
+
+                $blogTranslate = BlogTranslation::where('blog_id', $likes->id)->where('language_code', $language)->first();
+
+                if ($blogTranslate) {
+
+                    $likes->post_show = true;
+
+                    $likes->title = $blogTranslate->title;
+
+                    $likes->tags = $blogTranslate->tags;
+
+                    $likes->description = $blogTranslate->description;
+
+                    $likes->seo_title = $blogTranslate->seo_title;
+
+                    $likes->seo_keyword = $blogTranslate->seo_keyword;
+
+                    $likes->seo_tag = $blogTranslate->seo_tag;
+
+                    $likes->seo_description = $blogTranslate->seo_description;
+                }
+
+                if ($likes->category) {
+
+                    $catTranslate = CategoryTranslation::where('category_id', $likes->category->id)->where('language_code', $language)->first();
+
+                    if ($catTranslate) {
+
+                        $likes->category->name = $catTranslate->name;
+                    }
+                }
+
+
+
+                $likes->likes = Vote::where('blog_id', $likes->id)->get();
+
+                $likes->viewcount = BlogViewCount::where('blog_id', $likes->id)->count();
+
+                $img = BlogImages::where('blog_id', $likes->id)->orderBy('id', 'DESC')->first();
+
+                $user = User::where('id', $likes->created_by)->orderBy('id', 'DESC')->first();
+
+                $likes->blog_category_data = BlogCategory::where('blog_id', $likes->id)->with('category')->first();
+
+                if ($user) {
+
+                    if ($user->type == 'admin') {
+
+                        $likes->created_by_name = "SuperAdmin";
+                    } else {
+
+                        $likes->created_by_name = $user->name;
+                    }
+                } else {
+
+                    $likes->created_by_name = "--";
+                }
+
+                $likes->blog_image = '';
+
+                if ($img) {
+
+                    $likes->blog_image = $img->image;
+                }
+            }
+
+            return $data;
+        } catch (\Exception $e) {
+
+            return ['status' => false, 'message' => $e->getMessage() . ' ' . $e->getLine() . ' ' . $e->getFile()];
+        }
+    }
+
+
+
+    /**
+
+     * Get All category
+
+     * @param Search data
+
+     * @return array
+
+     */
+
+    public static function getCategoryBlog($id)
+    {
+
+        try {
+
+            $category = new self;
+
+            $pagination_no = 20;
+
+            if (isset($_GET['per_page']) && !empty($_GET['per_page'])) {
+
+                $pagination_no = $_GET['per_page'];
+            }
+
+            $blogIdArr = array();
+
+            $blogCategory = BlogCategory::where('category_id', $id)->get();
+
+            if (count($blogCategory)) {
+
+                foreach ($blogCategory as $blogCategory_data) {
+
+                    array_push($blogIdArr, $blogCategory_data->blog_id);
+                }
+            }
+
+            $data = $category->whereIn('id', $blogIdArr)->where('status', 1)->where('schedule_date', "<=", date("Y-m-d H:i:s"))->orderBy('id', 'DESC')->paginate($pagination_no)->appends('per_page', $pagination_no);;
+
+            if ($data) {
+
+                $language = \Helpers::returnUserLangCode();
+
+                $catTranslate = CategoryTranslation::where('category_id', $id)->where('language_code', $language)->first();
+
+                if ($catTranslate) {
+
+                    $data->name = $catTranslate->name;
+                }
+
+                foreach ($data as $row) {
+
+                    $row->post_show = false;
+
+                    $blogTranslate = BlogTranslation::where('blog_id', $row->id)->where('language_code', $language)->first();
+
+                    if ($blogTranslate) {
+
+                        $row->post_show = true;
+
+                        $row->title = $blogTranslate->title;
+
+                        $row->tags = $blogTranslate->tags;
+
+                        $row->description = $blogTranslate->description;
+
+                        $row->seo_title = $blogTranslate->seo_title;
+
+                        $row->seo_keyword = $blogTranslate->seo_keyword;
+
+                        $row->seo_tag = $blogTranslate->seo_tag;
+
+                        $row->seo_description = $blogTranslate->seo_description;
+                    }
+
+
+
+                    if ($row->category) {
+
+                        $catTranslate = CategoryTranslation::where('category_id', $id)->where('language_code', $language)->first();
+
+                        if ($catTranslate) {
+
+                            $row->name = $catTranslate->name;
+                        }
+                    }
+
+
+
+                    $row->likes = Vote::where('blog_id', $row->id)->get();
+
+                    $row->viewcount = BlogViewCount::where('blog_id', $row->id)->count();
+
+                    $img = BlogImages::where('blog_id', $row->id)->orderBy('id', 'DESC')->first();
+
+                    $user = User::where('id', $row->created_by)->orderBy('id', 'DESC')->first();
+
+                    $row->blog_category_data = BlogCategory::where('blog_id', $row->id)->with('category')->first();
+
+
+
+                    if ($user) {
+
+                        if ($user->type == 'admin') {
+
+                            $row->created_by_name = "SuperAdmin";
+                        } else {
+
+                            $row->created_by_name = "--";
+                        }
+                    } else {
+
+                        $row->created_by_name = "--";
+                    }
+
+                    if ($img) {
+
+                        $row->blog_image = $img->image;
+                    }
+                }
+            }
+
+            return $data;
+        } catch (\Exception $e) {
+
+            return ['status' => false, 'message' => $e->getMessage() . ' ' . $e->getLine() . ' ' . $e->getFile()];
+        }
+    }
+}

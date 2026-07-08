@@ -1,0 +1,1969 @@
+<?php
+
+
+
+namespace App\Http\Controllers;
+
+
+
+use Illuminate\Http\Request;
+
+use App\Models\User;
+
+use App\Models\Feedback;
+
+use App\Models\Story;
+
+use App\Models\ProductRequest;
+
+use App\Models\Walletproduct;
+
+use App\Models\Wallet;
+use Illuminate\Support\Facades\Mail;
+use App\Models\DeviceToken;
+use App\Models\Notification;
+use App\Models\CustomNotification;
+use App\Models\BlogTranslation;
+use App\Models\SiteContent;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
+use Auth;
+use Mockery\Matcher\Not;
+use UploadImage;
+
+
+
+class UserAPIController extends Controller
+{
+
+    #produt request---------------------
+
+    public function list_request(Request $request)
+    {
+
+        $post = $request->all();
+
+        $validate = [
+
+            'user_id' => 'required',
+
+        ];
+
+        $validator = Validator::make($post, $validate);
+
+        if ($validator->fails()) {
+
+            $data['error'] = $validator->errors();
+
+
+
+            return response(\Helpers::sendFailureAjaxResponse($data['error']));
+        }
+
+        try {
+
+            $paper = ProductRequest::getuserrequest($request->user_id);
+            foreach ($paper as $key => $row) {
+                if ($row->product) {
+                    if ($row->product->img != '') {
+                        $row->product->img = url('upload/e-paper/original/' . $row->product->img);
+                    } else {
+                        $row->product->img = url('upload/category/default.png');
+                    }
+                }
+            }
+
+
+            return $this->sendResponse($paper, __('message_alerts.record_found'));
+        } catch (\Exception $e) {
+
+            return $this->sendError($e->getMessage(), 401);
+        }
+    }
+
+    public function pro_req(Request $request)
+    {
+
+        try {
+
+            $post = $request->all();
+
+            $validate = [
+
+                'product_id' => 'required',
+
+                'user_id' => 'required',
+
+            ];
+
+            $validator = Validator::make($post, $validate);
+
+            if ($validator->fails()) {
+
+                $data['error'] = $validator->errors();
+
+
+
+                return response(\Helpers::sendFailureAjaxResponse($data['error']));
+            } else {
+
+                $exist = ProductRequest::where('user_id', $request->user_id)->where('product_id', $request->product_id)->where('status', 1)->count();
+
+                if ($exist != 0) {
+
+
+
+
+
+                    $exist_pro = Walletproduct::find($request->product_id);
+
+                    if ($exist_pro->redeem == 0) {
+
+                        return response(\Helpers::sendFailureAjaxResponse(__('Request cannot send! product is one time already purchased')));
+                    }
+                }
+
+                $req = ProductRequest::where('user_id', $request->user_id)->where('status', 0)->count();
+
+                if ($req != 0) {
+
+
+
+
+
+                    return response(\Helpers::sendFailureAjaxResponse(__('Request can not send! previous request is not processed by our team.')));
+                }
+
+                $point_user = Wallet::where('user_id', $request->user_id)->sum('point');
+
+                $point_used = ProductRequest::where('user_id', $request->user_id)->where('status', 1)->sum('point');
+
+
+
+                $point = $point_user - $point_used;
+
+
+
+                $Walletproduct = Walletproduct::find($request->product_id);
+
+                if ($point < $Walletproduct->point) {
+
+
+
+                    return response(\Helpers::sendFailureAjaxResponse(__('insufficient amount!')));
+                }
+
+                $user = ProductRequest::create([
+
+
+
+                    'product_id' => $request->product_id,
+
+                    'user_id' => $request->user_id,
+
+
+
+                ]);
+
+                $data = $user;
+
+                return response(\Helpers::sendSuccessAjaxResponse(__('message_alerts.request_successfully'), $data));
+            }
+        } catch (\Exception $ex) {
+
+            echo $ex;
+            exit;
+
+            return response(\Helpers::sendFailureAjaxResponse(__('message_alerts.there_is_an_error')));
+        }
+    }
+
+    #wallet--------------
+
+    public function user_wallet(Request $request)
+    {
+
+        $post = $request->all();
+
+        $validate = [
+
+            'user_id' => 'required',
+
+        ];
+
+        $validator = Validator::make($post, $validate);
+
+        if ($validator->fails()) {
+
+            $data['error'] = $validator->errors();
+
+
+
+            return response(\Helpers::sendFailureAjaxResponse($data['error']));
+        }
+
+        try {
+
+            if (isset($request->user_id)) {
+                $user = User::where('id', $request->user_id)->first();
+                if (!isset($user->id)) {
+                    return $this->sendError('Your account has been deleted by the Admin', 401);
+                }
+            }
+
+
+
+            $point_user = Wallet::where('user_id', $request->user_id)->sum('point');
+
+            $point_used = ProductRequest::where('user_id', $request->user_id)->where('status', 1)->sum('point');
+
+            $paper['user_points'] = $point_user - $point_used;
+
+
+
+            return $this->sendResponse($paper, __('message_alerts.record_found'));
+        } catch (\Exception $e) {
+
+            return $this->sendError($e->getMessage(), 401);
+        }
+    }
+
+    // public function notificationEnabled(Request $request, $id)
+    // {
+    //     try {
+    //         $notification = Notification::where('id', '=', $id)->get();
+    //         return $this->sendResponse($notification, __('message_alerts.record_found'));
+    //     } catch (\Exception $e) {
+    //         return $this->sendError($e->getMessage(), 401);
+    //     }
+
+    // }
+
+    public function notificationEnabledUser(Request $request)
+    {
+
+        $post = $request->all();
+        $validate = [
+            'user_id' => 'required',
+        ];
+        $validator = Validator::make($post, $validate);
+        if ($validator->fails()) {
+            $data['error'] = $validator->errors();
+            return response(\Helpers::sendFailureAjaxResponse($data['error']));
+        }
+        try {
+            $User = User::where('id', $post['user_id'])->first();
+
+            if (!$User) {
+                return $this->sendError('Your account has been deleted by the Admin', 401);
+            }
+
+            // Toggle the value
+            $User->is_notiifcation = !$User->is_notiifcation;
+            $User->save();
+
+            return $this->sendResponse(['notification_enabled' => $User->is_notiifcation], 'Notification status updated.');
+        } catch (\Exception $e) {
+            return $this->sendError($e->getMessage(), 401);
+        }
+    }
+
+    public function notificationEnabled(Request $request)
+    {
+        $post = $request->all();
+        $validate = [
+            'user_id' => 'required',
+        ];
+        $validator = Validator::make($post, $validate);
+        if ($validator->fails()) {
+            $data['error'] = $validator->errors();
+            return response(\Helpers::sendFailureAjaxResponse($data['error']));
+        }
+        try {
+            $notification = Notification::getNotification($request->user_id);
+            if (!$notification) {
+                return $this->sendError(__('message_alerts.notification_not_found'), 404);
+            }
+            $noti = Notification::where('user_id', $request->user_id)->update(['isRead' => 1]);
+            return $this->sendResponse($notification, __('message_alerts.record_found'));
+        } catch (\Exception $e) {
+            return $this->sendError($e->getMessage(), 401);
+        }
+    }
+    public function notificationCount(Request $request)
+    {
+        $post = $request->all();
+        $validate = [
+            'user_id' => 'required',
+        ];
+        $validator = Validator::make($post, $validate);
+        if ($validator->fails()) {
+            $data['error'] = $validator->errors();
+            return response(\Helpers::sendFailureAjaxResponse($data['error']));
+        }
+        try {
+            $paper = Notification::where('user_id', $request->user_id)->where('isRead', 0)->count();
+            return $this->sendResponse($paper, __('message_alerts.record_found'));
+        } catch (\Exception $e) {
+            return $this->sendError($e->getMessage(), 401);
+        }
+    }
+    public function getCustomNotification(Request $request)
+    {
+        // $post = $request->all();
+        // $validate = [
+        //     'user_id' => 'required',
+        // ];
+        // $validator = Validator::make($post, $validate);
+        // if ($validator->fails()) {
+        //     $data['error'] = $validator->errors();
+        //     return response(\Helpers::sendFailureAjaxResponse($data['error']));
+        // }
+        try {
+            $lang_code = strtolower((string) ($request->lang_code ?? 'en'));
+
+            $paper = CustomNotification::getCustomNotification($request->user_id);
+
+            if (isset($request->user_id) && $request->user_id != '') {
+                $firstDate = $paper->first() ? $paper->first()->created_at->toDateString() : null;
+                $lastDate  = $paper->last() ? $paper->last()->created_at->toDateString() : null;
+
+                $notification = Notification::where('user_id', $request->user_id)->get();
+
+                $filteredUserNotifications = $notification->filter(function ($n) use ($firstDate, $lastDate) {
+                    $nDate = $n->created_at->toDateString();
+
+                    return $nDate <= $firstDate && $nDate >= $lastDate;
+                });
+
+                $merged = $paper->getCollection()
+                    ->merge($filteredUserNotifications)
+                    ->sortByDesc('created_at')
+                    ->values();
+
+                // Replace collection inside paginator
+                $paper->setCollection($merged);
+            }
+
+            if ($lang_code === 'hi') {
+                $notificationCollection = $paper->getCollection();
+
+                $blogIds = $notificationCollection
+                    ->map(function ($item) {
+                        if (!empty($item->post_id) && is_numeric($item->post_id)) {
+                            return (int) $item->post_id;
+                        }
+
+                        if (!empty($item->notificationId) && is_numeric($item->notificationId)) {
+                            return (int) $item->notificationId;
+                        }
+
+                        return null;
+                    })
+                    ->filter()
+                    ->unique()
+                    ->values();
+
+                if ($blogIds->isNotEmpty()) {
+                    $translatedTitles = BlogTranslation::whereIn('blog_id', $blogIds)
+                        ->where('language_code', 'hi')
+                        ->pluck('title', 'blog_id');
+
+                    $paper->setCollection(
+                        $notificationCollection->map(function ($item) use ($translatedTitles) {
+                            $blogId = null;
+
+                            if (!empty($item->post_id) && is_numeric($item->post_id)) {
+                                $blogId = (int) $item->post_id;
+                            } elseif (!empty($item->notificationId) && is_numeric($item->notificationId)) {
+                                $blogId = (int) $item->notificationId;
+                            }
+
+                            if ($blogId) {
+                                $translatedTitle = $translatedTitles->get($blogId);
+                                if (!empty($translatedTitle)) {
+                                    $item->title = $translatedTitle;
+                                }
+                            }
+
+                            return $item;
+                        })
+                    );
+                }
+            } else {
+                $notificationCollection = $paper->getCollection();
+
+                $blogIds = $notificationCollection
+                    ->map(function ($item) {
+                        if (!empty($item->post_id) && is_numeric($item->post_id)) {
+                            return (int) $item->post_id;
+                        }
+
+                        if (!empty($item->notificationId) && is_numeric($item->notificationId)) {
+                            return (int) $item->notificationId;
+                        }
+
+                        return null;
+                    })
+                    ->filter()
+                    ->unique()
+                    ->values();
+
+                if ($blogIds->isNotEmpty()) {
+                    $translatedTitles = BlogTranslation::whereIn('blog_id', $blogIds)
+                        ->where('language_code', 'en')
+                        ->pluck('title', 'blog_id');
+
+                    $paper->setCollection(
+                        $notificationCollection->map(function ($item) use ($translatedTitles) {
+                            $blogId = null;
+
+                            if (!empty($item->post_id) && is_numeric($item->post_id)) {
+                                $blogId = (int) $item->post_id;
+                            } elseif (!empty($item->notificationId) && is_numeric($item->notificationId)) {
+                                $blogId = (int) $item->notificationId;
+                            }
+
+                            if ($blogId) {
+                                $translatedTitle = $translatedTitles->get($blogId);
+                                if (!empty($translatedTitle)) {
+                                    $item->title = $translatedTitle;
+                                }
+                            }
+
+                            return $item;
+                        })
+                    );
+                }
+            }
+
+            return $this->sendResponse($paper, __('message_alerts.record_found'));
+        } catch (\Exception $e) {
+            return $this->sendError($e->getMessage(), 401);
+        }
+    }
+
+    public function getUser(Request $request)
+    {
+        // $post = $request->all();
+        // $validate = [
+        //     'user_id' => 'required',
+        // ];
+        // $validator = Validator::make($post, $validate);
+        // if ($validator->fails()) {
+        //     $data['error'] = $validator->errors();
+        //     return response(\Helpers::sendFailureAjaxResponse($data['error']));
+        // }
+        try {
+            $paper = User::get();
+            return $this->sendResponse($paper, __('message_alerts.record_found'));
+        } catch (\Exception $e) {
+            return $this->sendError($e->getMessage(), 401);
+        }
+    }
+
+    public function logout(Request $request)
+    {
+        try {
+            $userId = $request->user_id;
+            $user = User::find($userId);
+            if (!$user) {
+                return response(\Helpers::sendFailureAjaxResponse(__('Your account has been deleted by the Admin')));
+                // return response()->json(['error' => 'User not found'], 404);
+            }
+            User::where('id', $user->id)->update(['fcm_token' => null]);
+            return response(\Helpers::sendSuccessAjaxResponse(__('Logged out successfully')));
+        } catch (\Exception $e) {
+            return $this->sendError($e->getMessage(), 401);
+        }
+    }
+
+    public function wallet_history(Request $request)
+    {
+
+        $post = $request->all();
+
+        $validate = [
+
+            'user_id' => 'required',
+
+        ];
+
+        $validator = Validator::make($post, $validate);
+
+        if ($validator->fails()) {
+
+            $data['error'] = $validator->errors();
+
+
+
+            return response(\Helpers::sendFailureAjaxResponse($data['error']));
+        }
+
+        try {
+
+            if (isset($request->user_id)) {
+                $user = User::where('id', $request->user_id)->first();
+                if (!isset($user->id)) {
+                    return $this->sendError('Your account has been deleted by the Admin', 401);
+                }
+            }
+
+            $paper = Wallet::getuserwallet($request->user_id);
+
+
+
+            return $this->sendResponse($paper, __('message_alerts.record_found'));
+        } catch (\Exception $e) {
+
+            return $this->sendError($e->getMessage(), 401);
+        }
+    }
+
+    #story---------------
+
+    public function list_story(Request $request)
+    {
+        $post = $request->all();
+        $validate = [
+            'user_id' => 'required',
+        ];
+        $validator = Validator::make($post, $validate);
+        if ($validator->fails()) {
+            $data['error'] = $validator->errors();
+            return response(\Helpers::sendFailureAjaxResponse($data['error']));
+        }
+        try {
+            if (isset($request->user_id)) {
+                $user_check = User::where('id', $request->user_id)->first();
+                if (!isset($user_check->id)) {
+                    return $this->sendError('Your account has been deleted by the Admin', 401);
+                }
+            }
+            $paper = Story::getuserstory($request->user_id);
+            return $this->sendResponse($paper, __('message_alerts.record_found'));
+        } catch (\Exception $e) {
+            return $this->sendError($e->getMessage(), 401);
+        }
+    }
+
+    public function save_story(Request $request)
+    {
+
+        try {
+
+            $post = $request->all();
+
+            $validate = [
+
+                'name' => 'required',
+
+                'email' => 'required',
+
+                'story' => 'required',
+
+                'user_id' => 'required',
+
+            ];
+
+            $validator = Validator::make($post, $validate);
+
+            if ($validator->fails()) {
+
+                $data['error'] = $validator->errors();
+
+
+
+                return response(\Helpers::sendFailureAjaxResponse($data['error']));
+            } else {
+
+                if (isset($request->user_id)) {
+                    $user_check = User::where('id', $request->user_id)->first();
+                    if (!isset($user_check->id)) {
+                        return $this->sendError('Your account has been deleted by the Admin', 401);
+                    }
+                }
+
+                $storedUrls = [];
+                $fileToStore = '';
+
+                $imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'heif', 'heic'];
+                $videoExtensions = ['mp4', 'mov', 'webm', 'ogg', 'avi', 'mkv', 'wmv', '3gp', 'flv'];
+
+                $maxImageBytes = 50 * 1024 * 1024; // 50MB per image
+                $maxVideoBytes = 10 * 1024 * 1024; // 10MB per video
+
+                $maxImages = 3;
+                $maxVideos = 1;
+                $maxFiles = 4; // total (3 images + 1 video)
+
+                $uploadedFiles = [];
+                $stack = [$request->allFiles()];
+
+                while (!empty($stack)) {
+                    $current = array_pop($stack);
+                    if ($current instanceof \Illuminate\Http\UploadedFile) {
+                        $uploadedFiles[] = $current;
+                        continue;
+                    }
+
+                    if (is_array($current)) {
+                        foreach ($current as $v) {
+                            $stack[] = $v;
+                        }
+                    }
+                }
+
+                if (!empty($uploadedFiles)) {
+                    $validatedFiles = [];
+
+                    $imageCount = 0;
+                    $videoCount = 0;
+
+                    $filesWithExt = [];
+                    foreach ($uploadedFiles as $uploadedFile) {
+                        if (!$uploadedFile->isValid()) {
+                            return response(\Helpers::sendFailureAjaxResponse('Invalid file upload.'));
+                        }
+
+                        $extension = strtolower((string) $uploadedFile->getClientOriginalExtension());
+                        if ($extension === '') {
+                            $extension = strtolower((string) $uploadedFile->extension());
+                        }
+
+                        if ($extension === '' || (!in_array($extension, $imageExtensions, true) && !in_array($extension, $videoExtensions, true))) {
+                            return response(\Helpers::sendFailureAjaxResponse('Invalid file type. Allowed images: ' . implode(', ', $imageExtensions) . ' and videos: ' . implode(', ', $videoExtensions)));
+                        }
+
+                        if (in_array($extension, $videoExtensions, true)) {
+                            $videoCount++;
+                        } else {
+                            $imageCount++;
+                        }
+
+                        $filesWithExt[] = [$uploadedFile, $extension];
+                    }
+
+                    if ($imageCount > $maxImages && $videoCount === 0) {
+                        return response(\Helpers::sendFailureAjaxResponse("You can select only {$maxImages} images."));
+                    }
+
+                    if ($videoCount > $maxVideos && $imageCount === 0) {
+                        return response(\Helpers::sendFailureAjaxResponse("You can select only {$maxVideos} video."));
+                    }
+
+                    if ($imageCount > $maxImages || $videoCount > $maxVideos || ($imageCount + $videoCount) > $maxFiles) {
+                        return response(\Helpers::sendFailureAjaxResponse("You can upload maximum {$maxFiles} files (3 images + 1 video)."));
+                    }
+
+                    foreach ($filesWithExt as [$uploadedFile, $extension]) {
+                        $size = $uploadedFile->getSize();
+                        if (in_array($extension, $videoExtensions, true)) {
+                            if (is_numeric($size) && (int) $size > $maxVideoBytes) {
+                                return response(\Helpers::sendFailureAjaxResponse('Video size must be 10MB or less.'));
+                            }
+                        } else {
+                            if (is_numeric($size) && (int) $size > $maxImageBytes) {
+                                return response(\Helpers::sendFailureAjaxResponse('Image file too large. Max 50MB.'));
+                            }
+                        }
+
+                        $validatedFiles[] = [$uploadedFile, $extension];
+                    }
+
+                    $destinationDir = public_path('upload/story');
+                    if (!is_dir($destinationDir) && !@mkdir($destinationDir, 0755, true)) {
+                        return response(\Helpers::sendFailureAjaxResponse('Unable to create upload directory.'));
+                    }
+
+                    foreach ($validatedFiles as [$uploadedFile, $extension]) {
+                        $name = time() . '_' . Str::random(16) . '.' . $extension;
+                        $uploadedFile->move($destinationDir, $name);
+                        $storedUrls[] = url('upload/story/' . $name);
+                    }
+                }
+
+                if (count($storedUrls) === 1) {
+                    $fileToStore = $storedUrls[0];
+                } elseif (count($storedUrls) > 1) {
+                    $fileToStore = json_encode($storedUrls);
+                }
+
+                $user = Story::create([
+
+                    'name' => $request->name,
+
+                    'email' => $request->email,
+
+                    'phone' => $request->phone,
+
+                    'story' => $request->story,
+
+                    'user_id' => $request->user_id,
+
+                    'file' => $fileToStore
+
+                ]);
+
+                $data = $user->toArray();
+                $data['file'] = $storedUrls[0] ?? ($user->file ?? '');
+                $data['files'] = $storedUrls;
+                if ((string) $request->input('debug_files') === '1') {
+                    $data['debug_files_received'] = array_map(function ($f) {
+                        return [
+                            'name' => $f->getClientOriginalName(),
+                            'size' => $f->getSize(),
+                        ];
+                    }, $uploadedFiles);
+                }
+
+                return response(\Helpers::sendSuccessAjaxResponse(__('message_alerts.story_successfully'), $data));
+            }
+        } catch (\Exception $ex) {
+            return response(\Helpers::sendFailureAjaxResponse(__('message_alerts.there_is_an_error')));
+        }
+    }
+
+    /**
+
+     * feed back
+
+     */
+
+    public function feedback(Request $request)
+    {
+
+        try {
+
+            $post = $request->all();
+
+            $validate = [
+
+                'name' => 'required',
+
+                'email' => 'required',
+
+                'feedback' => 'required',
+
+            ];
+
+            $validator = Validator::make($post, $validate);
+
+            if ($validator->fails()) {
+
+                $data['error'] = $validator->errors();
+
+
+
+                return response(\Helpers::sendFailureAjaxResponse($data['error']));
+            } else {
+
+                $user = Feedback::create([
+
+
+
+                    'name' => $request->name,
+
+                    'email' => $request->email,
+
+                    'phone' => $request->phone,
+
+                    'feed_back' => $request->feedback,
+
+
+
+                ]);
+
+                $data = $user;
+
+                return response(\Helpers::sendSuccessAjaxResponse(__('message_alerts.feedback_successfully'), $data));
+            }
+        } catch (\Exception $ex) {
+
+            echo $ex;
+            exit;
+
+            return response(\Helpers::sendFailureAjaxResponse(__('message_alerts.there_is_an_error')));
+        }
+    }
+
+
+
+    /**
+
+     * Registration Req
+
+     */
+
+
+
+
+
+    public function register(Request $request)
+    {
+
+        try {
+            $post = $request->all();
+            $validate = [
+                'name' => 'required',
+                // 'email' => 'required',
+                'password' => 'required',
+            ];
+
+            $validator = Validator::make($post, $validate);
+            if ($validator->fails()) {
+                $data['error'] = $validator->errors();
+                return response(\Helpers::sendFailureAjaxResponse($data['error']));
+            } else {
+                // $emailExist = User::where('email', $request->email)->get();
+                // if (count($emailExist)) {
+                //     return response(\Helpers::sendFailureAjaxResponse('Email already used'));
+                // }
+                if (isset($request->email) && $request->email != '') {
+                    $emailExist = User::where('email', $request->email)->get();
+                    if (count($emailExist)) {
+                        return response(\Helpers::sendFailureAjaxResponse('Email already used'));
+                    }
+                }
+                if (isset($post['phone'])) {
+                    if (!preg_match('/^\d+$/', $post['phone'])) {
+                        return response(\Helpers::sendFailureAjaxResponse('Phone number must contain digits only.'));
+                    }
+
+                    // ✅ Validate Indian phone number format (starts 6-9 and 10 digits)
+                    if (!preg_match('/^[6-9]\d{9}$/', $post['phone'])) {
+                        return response(\Helpers::sendFailureAjaxResponse('Please enter a valid 10-digit mobile number.'));
+                    }
+                    if (strlen($post['phone']) < 10) {
+                        return response(\Helpers::sendFailureAjaxResponse('Please enter at least 10 digit for phone.'));
+                    } else if (strlen($post['phone']) > 10) {
+                        return response(\Helpers::sendFailureAjaxResponse('Please enter 10 digit for phone.'));
+                    }
+                }
+                if (strlen($post['name']) < 3) {
+                    return response(\Helpers::sendFailureAjaxResponse('Please enter at least 3 charater for username.'));
+                } else if (strlen($post['password']) <= 2) {
+                    return response(\Helpers::sendFailureAjaxResponse('Password must be 3 digit.'));
+                }
+                if (isset($post['photo']) && $post['photo'] != '') {
+                    $images = $post['photo'];
+                    $post['photo'] = time() . rand() . '.' . $images->getClientOriginalExtension();
+                    $img = \UploadImage::make($images->getRealPath());
+                    $destinationPath = public_path('/user');
+                    $images->move($destinationPath, $post['photo']);
+                }
+                $img = '';
+                if (isset($post['photo']) && $post['photo'] != '') {
+                    $img = $post['photo'];
+                }
+                if (isset($request->phone) && $request->phone != '') {
+                    $phone = $request->phone;
+                } else {
+                    $phone = "";
+                }
+                $otp = rand(1000, 9999);
+                //todo Email
+                $otp_data = array();
+                $otp_data['otp'] = $otp;
+                $expireAt = now()->addMinutes(5);
+
+                $user = User::create([
+                    'type' => 'user',
+                    'name' => $request->name,
+                    'email' => $request->email,
+                    'gender' => $request->gender,
+                    'photo' => $img,
+                    'phone' => $phone,
+                    'active' => 1,
+                    'lang_code' => Setting('preferred_site_language'),
+                    'password' => bcrypt($request->password),
+                    'device_token' => $request->player_id ?? null,
+                    'otp' => $otp,
+                    'otp_expire_at' => $expireAt,
+                ]);
+                if (isset($request->player_id)) {
+
+                    $deviceTokens = DeviceToken::where('device_token', $request->player_id)->get();
+                    if (count($deviceTokens) == 0) {
+                        $device_token = array(
+                            'device_id' => $request->device_id ?? null,
+                            'device_token' => $request->player_id ?? null,
+                            'created_at' => date('Y-m-d H:i:s'),
+                        );
+                        $device_token = DeviceToken::insertGetId($device_token);
+                    }
+                }
+
+                $data = $user;
+                $data->api_token = 'token' . rand();
+                $data->isNewUser = true;
+                $data->id = (string) $data->id;
+
+                $c = \Helpers::sendEmail('emails.register', $otp_data, $request->email, '', 'Otp', setting('site_name'), '', '');
+                return response(\Helpers::sendSuccessAjaxResponse(__('message_alerts.registerd_successfully'), $data));
+            }
+        } catch (\Exception $ex) {
+            echo $ex;
+            exit;
+            return response(\Helpers::sendFailureAjaxResponse(__('message_alerts.there_is_an_error')));
+        }
+    }
+
+
+
+    /**
+
+     * Login Req
+
+     */
+
+    public function login(Request $request)
+    {
+
+        try {
+
+            $user = User::where('email', $request->email)->first();
+
+            if ($user) {
+
+                if ($user->type == 'user') {
+
+                    $data = [
+
+                        'email' => $request->email,
+
+                        'password' => $request->password
+
+                    ];
+                    if (isset($user->otp) && !empty($user->otp)) {
+                        $otp = rand(1000, 9999);
+                        $otp_expire = now()->addMinutes(5);
+
+                        // Save to user
+                        $user->otp = $otp;
+                        $user->otp_expire_at = $otp_expire;
+                        $user->save();
+
+                        // Send email
+                        $otp_data = ['otp' => $otp];
+                        $data = \Helpers::sendEmail('emails.register', $otp_data, $user->email, '', 'Resend OTP', setting('site_name'), '', '');
+
+                        return response(\Helpers::sendFailureAjaxResponse(__('Your Account Is Not verified'), ['isVerified' => false]));
+                    }
+
+                    if ($request->password == "") {
+
+                        //$token = $user->createToken('LaravelAuthApp')->accessToken;
+
+                        $data = $user;
+
+                        // $data->api_token = $token;
+
+                        $data->api_token = 'token' . rand();
+
+                        $data->id = (string) $data->id;
+
+                        $data->otp = (string) $data->otp;
+
+                        $data->isNewUser = true;
+
+                        return response(\Helpers::sendSuccessAjaxResponse(__('message_alerts.registerd_successfully'), $data));
+                    } else {
+
+                        if (auth()->attempt($data)) {
+
+                            // $token = auth()->user()->createToken('LaravelAuthApp')->accessToken;
+
+                            $data = auth()->user();
+
+
+
+                            //$data->api_token = $token;
+
+                            $data->api_token = 'token' . rand();
+
+                            $data->id = (string) $data->id;
+
+                            $data->otp = (string) $data->otp;
+
+                            $data->isVerified = true;
+
+                            if (strpos($request->email, '@')) {
+
+
+
+                                $user->login_from = 'email';
+                            } else {
+
+                                $user->login_from = 'phone';
+                            }
+
+                            $user->save();
+
+                            return response(\Helpers::sendSuccessAjaxResponse('Login Successfully.', $data));
+                        } else {
+
+                            return response(\Helpers::sendFailureAjaxResponse(__('message_alerts.unauthorized'), ['isVerified' => true]));
+                        }
+                    }
+                } else {
+
+                    return response(\Helpers::sendFailureAjaxResponse(__('message_alerts.use_valid_email_password'), ['isVerified' => true]));
+                }
+            } else {
+
+                return response(\Helpers::sendFailureAjaxResponse(__('message_alerts.user_not_found'), ['isVerified' => true]));
+            }
+        } catch (\Exception $ex) {
+
+            return response(\Helpers::sendFailureAjaxResponse(__('message_alerts.unauthorized'), ['isVerified' => true]));
+        }
+    }
+
+
+
+    /**
+
+     * forgetPassword
+
+     */
+
+    public function forgetPassword(Request $request)
+    {
+
+        try {
+            $post = $request->all();
+            if (!empty($post)) {
+                $emailexist = User::where('email', $post['email'])->first();
+
+                if ($emailexist) {
+                    // if ($emailexist->login_from == 'email') {
+                    if ($emailexist->login_from == 'email' || $emailexist->login_from == null || $emailexist->login_from == 'google') {
+                        $otp = rand(1000, 9999);
+                        //todo Email
+                        $data = array();
+                        $data['otp'] = $otp;
+                        $expireAt = now()->addMinutes(5);
+                        User::where('email', $post['email'])->update([
+                            'otp' => $otp,
+                            'otp_expire_at' => $expireAt
+                        ]);
+                        $c = \Helpers::sendEmail('emails.forgot-password', $data, $emailexist->email, '', 'Otp', setting('site_name'), '', '');
+                        return response(\Helpers::sendSuccessAjaxResponse('OTP Successfully sent.', $data));
+                    } else {
+                        return response(\Helpers::sendFailureAjaxResponse(__('You logged with social media')));
+                    }
+                } else {
+                    return response(\Helpers::sendFailureAjaxResponse(__('message_alerts.invalid_email_address')));
+                }
+            } else {
+                return response(\Helpers::sendFailureAjaxResponse(__('message_alerts.something_went_wrong')));
+            }
+        } catch (\Exception $ex) {
+            return response(\Helpers::sendFailureAjaxResponse(__('message_alerts.there_is_an_error')));
+        }
+    }
+
+
+    public function sendTestMail()
+    {
+
+        try {
+            $toEmail = 'fenipatel1308@gmail.com';
+            $toName = 'Tutorials Point';
+            $subject = 'Laravel Basic Testing Mail';
+            $content = 'This is a test email from Laravel!';
+
+            Mail::send([], [], function ($message) use ($toEmail, $toName, $subject, $content) {
+                $message->to($toEmail, $toName)->subject($subject)->setBody($content);
+                $message->from('patelfenu1311@gmail.com', 'Feni Patel');
+            });
+            return "Basic Email Sent. Check your inbox.";
+        } catch (\Exception $e) {
+            return "Error sending email: " . $e->getMessage();
+        }
+    }
+
+
+
+    /**
+
+     * resetPassword
+
+     */
+
+    public function resetPassword(Request $request)
+    {
+
+        try {
+
+            $post = $request->all();
+
+            if (!empty($post)) {
+
+                $inject = array();
+
+                if (isset($post['password']) && $post['password'] != '') {
+
+                    $inject['password'] = bcrypt($post['password']);
+                } else {
+                    return response(\Helpers::sendFailureAjaxResponse(__('message_alerts.something_went_wrong')));
+                }
+
+                $user = User::where('email', $post['email'])->first();
+
+                User::where('id', $user->id)->update($inject);
+
+                return response(\Helpers::sendSuccessAjaxResponse(__('message_alerts.password_reset_success'), $post));
+            } else {
+
+                return response(\Helpers::sendFailureAjaxResponse(__('message_alerts.something_went_wrong')));
+            }
+        } catch (\Exception $ex) {
+
+            return response(\Helpers::sendFailureAjaxResponse(__('message_alerts.there_is_an_error')));
+        }
+    }
+
+    /**
+
+     * OTP verification
+
+     */
+
+    public function verifyOtp(Request $request)
+    {
+
+        try {
+
+            $post = $request->all();
+
+            if (!empty($post)) {
+
+                $inject = array();
+
+
+                if (!(isset($post['otp']) && $post['otp'] != '')) {
+                    return response(\Helpers::sendFailureAjaxResponse(__('message_alerts.otp_is_required')));
+                }
+                if (!(isset($post['email']) && $post['email'] != '')) {
+                    return response(\Helpers::sendFailureAjaxResponse(__('message_alerts.something_went_wrong')));
+                }
+
+                $user = User::where('email', $post['email'])
+                    ->where('otp', $post['otp'])
+                    ->where('otp_expire_at', '>=', now())
+                    ->first();
+
+                if (!$user) {
+                    return response(\Helpers::sendFailureAjaxResponse(__('message_alerts.invalid_or_expired_otp')));
+                }
+
+                $data = $user;
+
+
+
+
+                $user->otp = null;
+                $user->otp_expire_at = null;
+                $user->save();
+                if (ceil($user->created_at->diffInSeconds($user->otp_expire_at) / 60) <= 6) {
+                    $register_data = array();
+                    $register_data['name'] = $user->name;
+                    $c = \Helpers::sendEmail('emails.register_successfully', $register_data, $user->email, '', 'User Register Successfully', setting('site_name'), '', '');
+                }
+
+                return response(\Helpers::sendSuccessAjaxResponse(__('message_alerts.otp_varified_success'), $data));
+            } else {
+
+                return response(\Helpers::sendFailureAjaxResponse(__('message_alerts.something_went_wrong')));
+            }
+        } catch (\Exception $ex) {
+
+            return response(\Helpers::sendFailureAjaxResponse(__('message_alerts.there_is_an_error')));
+        }
+    }
+
+
+    public function resendOtp(Request $request)
+    {
+        $post = $request->all();
+
+        $validator = Validator::make($post, [
+            'email' => 'required|email'
+        ]);
+
+        if ($validator->fails()) {
+            return response(\Helpers::sendFailureAjaxResponse($validator->errors()));
+        }
+
+        $user = User::where('email', $request->email)->first();
+
+        if (!$user) {
+            return response(\Helpers::sendFailureAjaxResponse('User not found.'));
+        }
+
+        // Generate new OTP
+        $otp = rand(1000, 9999);
+        $otp_expire = now()->addMinutes(5);
+
+        // Save to user
+        $user->otp = $otp;
+        $user->otp_expire_at = $otp_expire;
+        $user->save();
+
+        // Send email
+        $otp_data = ['otp' => $otp];
+        \Helpers::sendEmail('emails.register', $otp_data, $user->email, '', 'Resend OTP', setting('site_name'), '', '');
+
+        return response(\Helpers::sendSuccessAjaxResponse('OTP resent successfully.', ['otp' => $otp]));
+    }
+
+    /**
+
+     * updateProfile
+
+     */
+
+    public function updateProfile(Request $request)
+    {
+
+        try {
+
+            $post = $request->all();
+
+            if (!empty($post)) {
+                if (isset($request->id)) {
+                    $user_check = User::where('id', $request->id)->first();
+                    if (!isset($user_check->id)) {
+                        return $this->sendError('Your account has been deleted by the Admin', 401);
+                    }
+                }
+
+                $emailexist = User::where('email', $post['email'])->where('id', '!=', $post['id'])->get();
+
+                if (count($emailexist)) {
+
+                    return response(\Helpers::sendFailureAjaxResponse('Email already taken'));
+                }
+                if (isset($post['phone']) && $post['phone'] != '') {
+
+                    if (!preg_match('/^\d+$/', $post['phone'])) {
+                        return response(\Helpers::sendFailureAjaxResponse('Phone number must contain digits only.'));
+                    }
+
+                    // ✅ Validate Indian phone number format (starts 6-9 and 10 digits)
+                    if (!preg_match('/^[6-9]\d{9}$/', $post['phone'])) {
+                        return response(\Helpers::sendFailureAjaxResponse('Please enter a valid 10-digit mobile number.'));
+                    }
+                    if (strlen($post['phone']) < 10) {
+                        return response(\Helpers::sendFailureAjaxResponse('Please enter at least 10 digit for phone.'));
+                    } else if (strlen($post['phone']) > 10) {
+                        return response(\Helpers::sendFailureAjaxResponse('Please enter 10 digit for phone.'));
+                    }
+                }
+
+                $name = '';
+
+                $img = '';
+
+
+
+                $file = $request->file('photo');
+
+                if ($file != '') {
+
+                    $name = time() . rand() . '.' . $file->getClientOriginalExtension();
+
+                    $destination = public_path('/upload/user/') . $name;
+
+                    $c = \Helpers::compress_image($file, $destination, 30);
+                }
+
+
+
+                $inject = array();
+
+                if (isset($post['photo']) && $post['photo'] != '') {
+
+                    $img = $post['photo'];
+
+                    $inject['photo'] = $post['photo'];
+                }
+
+                if (isset($post['name']) && $post['name'] != '') {
+
+                    $inject['name'] = $post['name'];
+                }
+
+                if (isset($post['email']) && $post['email'] != '') {
+
+                    $inject['email'] = $post['email'];
+                }
+
+                if (isset($post['gender']) && $post['gender'] != '') {
+
+                    $inject['gender'] = $post['gender'];
+                }
+
+                if (isset($post['phone']) && $post['phone'] != '') {
+
+                    $inject['phone'] = $post['phone'];
+                }
+
+
+
+                if (isset($post['password']) && $post['password'] != '') {
+
+                    $inject['password'] = bcrypt($post['password']);
+                }
+
+                if (isset($post['lang_code']) && $post['lang_code'] != '') {
+
+                    $inject['lang_code'] = $post['lang_code'];
+                }
+
+                User::where('id', $post['id'])->update($inject);
+
+                $data = User::where('id', $post['id'])->first();
+
+                if ($data) {
+
+                    $data->id = (string) $data->id;
+
+                    $data->otp = (string) $data->otp;
+                }
+
+                return response(\Helpers::sendSuccessAjaxResponse(__('message_alerts.profile_updated_success'), $data));
+            } else {
+
+                return response(\Helpers::sendFailureAjaxResponse(__('message_alerts.something_went_wrong')));
+            }
+        } catch (\Exception $ex) {
+
+            return response(\Helpers::sendFailureAjaxResponse(__('message_alerts.there_is_an_error')));
+        }
+    }
+
+
+
+    /**
+
+     * Update Profile Picture 
+
+     */
+
+    public function updateProfilePicture(Request $request)
+    {
+
+        try {
+
+            $post = $request->all();
+
+            if (!empty($post)) {
+                if (isset($request->id)) {
+                    $user_check = User::where('id', $request->id)->first();
+                    if (!isset($user_check->id)) {
+                        return $this->sendError('Your account has been deleted by the Admin', 401);
+                    }
+                }
+
+                if (isset($_FILES['photo'])) {
+
+                    $image = $_FILES['photo'];
+
+                    $name = time() . rand() . '.png';
+
+                    $imagepath = public_path('upload/user/');
+
+                    $tmp_name = $_FILES["photo"]["tmp_name"];
+
+                    $path = $imagepath . $name;
+
+                    $post['photo'] = url('upload/user/') . '/' . $name;
+
+                    move_uploaded_file($_FILES['photo']['tmp_name'], $path);
+                }
+
+                $img = '';
+
+                $inject = array();
+
+                if (isset($post['photo']) && $post['photo'] != '') {
+
+                    $img = $post['photo'];
+
+                    $inject['photo'] = $post['photo'];
+                }
+
+                User::where('id', $post['id'])->update($inject);
+
+                $data = User::where('id', $post['id'])->first();
+
+                return response(\Helpers::sendSuccessAjaxResponse(__('message_alerts.profile_updated_success'), $data));
+            } else {
+
+                return response(\Helpers::sendFailureAjaxResponse(__('message_alerts.something_went_wrong')));
+            }
+        } catch (\Exception $ex) {
+
+            return response(\Helpers::sendFailureAjaxResponse(__('message_alerts.there_is_an_error')));
+        }
+    }
+
+
+
+
+
+    /**
+
+     * updateProfile
+
+     */
+
+    public function getProfile(Request $request)
+    {
+        $post = $request->all();
+
+        if (isset($post['id'])) {
+            $user = User::where('id', $post['id'])->first();
+            if (!isset($user->id)) {
+                return $this->sendError('Your account has been deleted by the Admin', 401);
+            }
+        }
+
+        try {
+
+            $post = $request->all();
+
+
+            if (isset($post['id'])) {
+
+                $userData = User::where('id', $post['id'])->first();
+
+                $userData->id = (string) $userData->id;
+
+                $userData->otp = (string) $userData->otp;
+
+                return response(\Helpers::sendSuccessAjaxResponse(__('message_alerts.profile_updated_success'), $userData));
+            } else {
+
+                return response(\Helpers::sendFailureAjaxResponse(__('message_alerts.something_went_wrong')));
+            }
+        } catch (\Exception $ex) {
+            return response(\Helpers::sendFailureAjaxResponse(__('message_alerts.there_is_an_error')));
+        }
+    }
+
+    /**
+
+     * updateProfile
+
+     */
+
+    public function updateToken(Request $request)
+    {
+        try {
+
+            $post = $request->all();
+            $data = array();
+            if (!empty($post)) {
+
+                $inject = array();
+
+                if (isset($post['player_id']) && $post['player_id'] != '') {
+
+                    $inject['fcm_token'] = $post['player_id'];
+
+                    $deviceTokens = DeviceToken::where('device_token',  $post['player_id'])->get();
+                    if (count($deviceTokens) == 0) {
+                        $device_token = array(
+                            'device_id' =>  $post['device_id'] ?? null,
+                            'device_token' =>  $post['player_id'] ?? null,
+                            'created_at' => date('Y-m-d H:i:s'),
+                        );
+                        $device_token = DeviceToken::insertGetId($device_token);
+                    }
+                }
+                if (isset($post['id']) && $post['id'] != '') {
+                    User::where('id', $post['id'])->update($inject);
+
+                    $user = User::where('id', $post['id'])->first();
+                    $data = $user;
+                    $data->id = (string) $user->id;
+                }
+
+
+                return response(\Helpers::sendSuccessAjaxResponse(__('message_alerts.device_updated_success'), $data));
+            } else {
+
+                return response(\Helpers::sendFailureAjaxResponse(__('message_alerts.something_went_wrong')));
+            }
+        } catch (\Exception $ex) {
+            return $ex;
+            return response(\Helpers::sendFailureAjaxResponse(__('message_alerts.there_is_an_error')));
+        }
+    }
+
+
+
+    /**
+
+     * Delete Account
+
+     */
+
+    public function deleteAccount(Request $request)
+    {
+
+        try {
+
+            $post = $request->all();
+
+            if (!empty($post)) {
+
+                User::where('id', $post['id'])->delete();
+
+                return response(\Helpers::sendSuccessAjaxResponse(__('message_alerts.account_deleted_success'), []));
+            } else {
+
+                return response(\Helpers::sendFailureAjaxResponse(__('message_alerts.something_went_wrong')));
+            }
+        } catch (\Exception $ex) {
+
+            return response(\Helpers::sendFailureAjaxResponse(__('message_alerts.there_is_an_error')));
+        }
+    }
+
+
+
+    /**
+
+     * Registration Req
+
+     */
+
+    public function socialMediaLogin(Request $request)
+    {
+
+        try {
+
+            $post = $request->all();
+
+
+
+            if ($post["login_from"] != 'apple') {
+
+                $validate = [
+
+                    'name' => 'required|min:4',
+
+                    'email' => 'required',
+
+                ];
+            } else {
+
+                $validate = [
+
+                    'apple_token' => 'required',
+
+                ];
+            }
+
+            $validator = Validator::make($post, $validate);
+
+            if ($validator->fails()) {
+
+                $data['error'] = $validator->errors();
+
+                return response(\Helpers::sendFailureAjaxResponse($data['error']));
+            } else {
+
+
+
+                // "email": "abc@gmail.com"
+
+                // "name": "name",
+
+                // "image":"this will be link,
+
+                // "apple_token": "apple token",
+
+                // "device_token": "token",
+
+                // "login_from": "apple"
+
+                if ($post["login_from"] != 'apple') {
+
+                    $emailexist = User::where('email', $post['email'])->first();
+                } else {
+
+                    $emailexist = User::where('apple_token', $post['apple_token'])->first();
+                }
+
+                if ($emailexist) {
+
+                    $data = $emailexist;
+
+                    if ($data->photo == null) {
+
+                        $data->photo = url('upload/user/default.png');
+                    }
+
+                    $data->isNewUser = false;
+
+                    $data->api_token = 'token' . rand();
+
+                    // $token = $data->createToken('LaravelAuthApp')->accessToken;
+
+                    // $data->api_token = $token;
+
+                    if ($data->photo == null) {
+
+                        $data->photo = url('upload/user/default.png');
+                    }
+
+                    // $data->isNewUser = true;
+
+                    $data->id = (string) $data->id;
+
+                    $data->otp = (string) $data->otp;
+
+                    return response(\Helpers::sendSuccessAjaxResponse(__('Login Successfully.'), $data));
+                } else {
+
+                    $login_from = 'facebook';
+
+                    if (isset($post['login_from'])) {
+
+                        $login_from = $post['login_from'];
+                    }
+
+
+
+                    if (isset($request->phone) && $request->phone != '') {
+
+                        $phone = $request->phone;
+                    } else {
+
+                        $phone = "";
+                    }
+
+
+
+                    if (isset($post['fb_token']) && $post['fb_token'] != '') {
+
+                        $fb_token = $post['fb_token'];
+                    } else {
+
+                        $fb_token = "";
+                    }
+
+
+
+                    if (isset($post['google_token'])) {
+
+                        $google_token = $post['google_token'];
+                    } else {
+
+                        $google_token = "";
+                    }
+
+
+
+                    if (isset($post['apple_token'])) {
+
+                        $apple_token = $post['apple_token'];
+                    } else {
+
+                        $apple_token = "";
+                    }
+
+
+
+                    if (isset($post['player_id'])) {
+
+                        $device_token = $post['player_id'];
+                    } else {
+
+                        $device_token = "";
+                    }
+
+                    $image = '';
+
+                    $saved_image = '';
+
+                    if ($login_from == 'facebook' && $request->fb_id != '') {
+
+                        $image = "https://graph.facebook.com/v2.9/" . $request->fb_id . "/picture?width=360&height=360";
+                    } else {
+
+                        $image = $request->image;
+                    }
+
+                    if ($image != '') {
+
+                        $content = file_get_contents($image);
+
+                        $name = time() . rand() . '.png';
+
+                        $imagepath = public_path('upload/user/');
+
+                        $fp = fopen($imagepath . '' . $name, "w");
+
+                        fwrite($fp, $content);
+
+                        fclose($fp);
+
+                        $saved_image = url('upload/user/') . '/' . $name;
+                    }
+
+
+
+                    $id = User::insertGetId([
+
+                        'name' => $request->name,
+
+                        'email' => $request->email,
+
+                        'photo' => $saved_image,
+
+                        'fb_token' => $fb_token,
+
+                        'google_token' => $google_token,
+
+                        'apple_token' => $apple_token,
+
+                        'login_from' => $login_from,
+
+                        'active' => 1,
+
+                        'created_at' => date('Y-m-d H:i:s')
+
+                    ]);
+
+                    $data = User::where('id', $id)->first();
+
+
+
+                    // $token = $data->createToken('LaravelAuthApp')->accessToken;
+
+                    //  $data->api_token = $token;
+
+                    $data->api_token = 'token' . rand();
+
+
+
+                    if ($data->photo == null) {
+
+                        $data->photo = url('upload/user/default.png');
+                    }
+
+                    $data->isNewUser = true;
+
+                    $data->id = (string) $data->id;
+
+                    $data->otp = (string) $data->otp;
+
+                    return response(\Helpers::sendSuccessAjaxResponse(__('message_alerts.registerd_successfully'), $data));
+                }
+            }
+        } catch (\Exception $ex) {
+
+            return response(\Helpers::sendFailureAjaxResponse(__('message_alerts.there_is_an_error')));
+        }
+    }
+
+    /**
+
+     * changePassword
+
+     */
+
+    public function changePassword(Request $request)
+    {
+
+        try {
+
+            $post = $request->all();
+
+            if (!empty($post)) {
+
+                if (isset($post['password']) && $post['password'] != '') {
+
+                    $inject['password'] = bcrypt($post['password']);
+                }
+
+                User::where('id', $post['id'])->update($inject);
+
+                $data = User::where('id', $post['id'])->first();
+
+                if ($data) {
+
+                    $data->id = (string) $data->id;
+
+                    $data->otp = (string) $data->otp;
+                }
+
+                return response(\Helpers::sendSuccessAjaxResponse(__('message_alerts.password_changed'), $data));
+            } else {
+
+                return response(\Helpers::sendFailureAjaxResponse(__('message_alerts.something_went_wrong')));
+            }
+        } catch (\Exception $ex) {
+
+            return response(\Helpers::sendFailureAjaxResponse(__('message_alerts.there_is_an_error')));
+        }
+    }
+
+
+
+    /**
+
+     * Add non logged in device token
+
+     */
+
+
+    public function addDeviceToken(Request $request)
+    {
+
+        try {
+
+            $post = $request->all();
+
+            $validate = [
+                'device_id' => 'required',
+
+                'player_id' => 'required',
+
+            ];
+
+            $validator = Validator::make($post, $validate);
+
+            if ($validator->fails()) {
+
+                $data['error'] = $validator->errors();
+
+                return response(\Helpers::sendFailureAjaxResponse($data['error']));
+            } else {
+                $deviceTokens = DeviceToken::where('device_token', $post['player_id'])->get();
+                if (count($deviceTokens) == 0) {
+                    $device_token = array(
+                        'device_id' => $post['device_id'],
+                        'device_token' => $post['player_id'],
+                        'created_at' => date('Y-m-d H:i:s'),
+                    );
+                    $user = DeviceToken::insertGetId($device_token);
+                }
+                return response(\Helpers::sendSuccessAjaxResponse("Device token added successfully", []));
+            }
+        } catch (\Exception $ex) {
+
+            return response(\Helpers::sendFailureAjaxResponse(__('message_alerts.there_is_an_error')));
+        }
+    }
+    public function removeDeviceToken(Request $request)
+    {
+
+        try {
+
+            $post = $request->all();
+
+            $validate = [
+                'device_id' => 'required',
+
+            ];
+
+            $validator = Validator::make($post, $validate);
+
+            if ($validator->fails()) {
+
+                $data['error'] = $validator->errors();
+
+                return response(\Helpers::sendFailureAjaxResponse($data['error']));
+            } else {
+                $deviceTokens = DeviceToken::where('device_id', $post['device_id'])->delete();
+
+                return response(\Helpers::sendSuccessAjaxResponse("Device token added successfully", []));
+            }
+        } catch (\Exception $ex) {
+
+            return response(\Helpers::sendFailureAjaxResponse(__('message_alerts.there_is_an_error')));
+        }
+    }
+
+    public function add_app_version(Request $request)
+    {
+        try {
+            $post = $request->all();
+
+            $validate = [
+                'version' => 'required',
+                'platform' => 'required|in:android,ios',
+                
+            ];
+
+            $validator = Validator::make($post, $validate);
+
+            if ($validator->fails()) {
+                $data['error'] = $validator->errors();
+                return response(\Helpers::sendFailureAjaxResponse($data['error']));
+            } else {
+
+              $exist = SiteContent::where('key', 'app_version_' . $post['platform'])->first();
+              
+
+                    if ($exist) {
+
+                        $id = SiteContent::where('id', $exist->id)->update(array('value' => $post['version']));
+
+                    } else {
+
+                        SiteContent::insert(array('key' => 'app_version_' . $post['platform'], 'value' => $post['version']));
+
+                    }
+                    if(isset($post['build'])){
+                        $buildexist = SiteContent::where('key', 'app_build_ios')->first();
+                        if($buildexist){
+                            $id = SiteContent::where('id', $buildexist->id)->update(array('value' => $post['build']));
+                        }else{
+                            SiteContent::insert(array('key' => 'app_build_ios', 'value' => $post['build']));
+                        }   
+                    }
+               
+                return response(\Helpers::sendSuccessAjaxResponse("App version added/updated successfully", $id));
+            }
+        } catch (\Exception $ex) {
+            return response(\Helpers::sendFailureAjaxResponse(__('message_alerts.there_is_an_error'), $ex->getMessage()));
+        }
+    }
+    public function get_app_version(Request $request)
+    {
+        try {
+            $post = $request->all();
+
+            $validate = [
+                'platform' => 'required|in:android,ios',
+            ];
+
+            $validator = Validator::make($post, $validate);
+
+            if ($validator->fails()) {
+                $data['error'] = $validator->errors();
+                return response(\Helpers::sendFailureAjaxResponse($data['error']));
+            } else {
+                if($post['platform'] == 'ios'){
+                    $build = SiteContent::where('key', 'app_build_ios')->first();
+                }else{
+                    $build = null;
+                }   
+                $app_version = SiteContent::where('key', 'app_version_' . $post['platform'])->first();
+                $app_version->build = $build ? $build->value : null;
+                return response(\Helpers::sendSuccessAjaxResponse("App version added/updated successfully", $app_version));
+            }
+        } catch (\Exception $ex) {
+            return response(\Helpers::sendFailureAjaxResponse(__('message_alerts.there_is_an_error')));
+        }
+    }
+}

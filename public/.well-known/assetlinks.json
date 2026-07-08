@@ -1,0 +1,18 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.buzzify",
+      "sha256_cert_fingerprints": [
+        "BC:3B:02:AD:81:9C:11:58:EF:67:68:C3:4B:1B:56:F5:33:B5:32:BD:BB:DB:28:41:B6:8A:10:3B:3A:7C:63:64",
+        "FA:C6:17:45:DC:09:03:78:6F:B9:ED:E6:2A:96:2B:39:9F:73:48:F0:BB:6F:89:9B:83:32:66:75:91:03:3B:9C",
+        "84:E6:7A:B9:B7:51:1F:AF:9E:C2:F9:90:61:1B:31:C2:D0:67:A6:E1:CF:B2:14:99:C3:A7:50:07:09:1F:36:9C",
+        "75:0E:75:F7:E4:D3:82:40:C9:E0:38:7C:CE:1E:81:E9:EA:E3:33:D7:BE:CC:3A:C8:61:41:97:DD:DD:EF:80:E0",
+        "0B:CA:DF:F2:01:67:C7:9E:DC:F6:BA:D3:74:6E:FC:D9:EB:01:3B:99:A9:37:12:C3:5C:5B:3B:00:F6:A4:4F:36"
+      ]
+    }
+  }
+] 

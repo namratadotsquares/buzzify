@@ -1,0 +1,13 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "77C464P24Z.com.buzzify",
+        "paths": [
+          "/public/blog-details/*"
+        ]
+      }
+    ]
+  }
+}
