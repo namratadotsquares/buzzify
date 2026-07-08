@@ -197,10 +197,6 @@
                 <span class="badge" id="active-count-badge">{{ $options->where('is_active', 1)->count() }} active</span>
             </div>
             <div style="display:flex;gap:10px;align-items:center;">
-                <button class="vis-add-btn" id="addRowBtn" type="button">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                    Add Option
-                </button>
                 <button class="vis-save-btn" id="saveAllBtn" type="button">
                     <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                     Save All
@@ -225,11 +221,7 @@
             <div class="vis-row {{ $option->is_active ? '' : 'vis-row--inactive' }}" data-id="{{ $option->id }}" data-sort="{{ $option->sort_order }}">
                 <span class="vis-row__drag" title="Drag to reorder">⠿</span>
                 <input type="text" class="vis-row__label-input" placeholder="Option label (e.g. Featured App)" value="{{ $option->label }}" data-field="label" required>
-                <select class="vis-row__select" data-field="field_key" title="Maps to DB column">
-                    @foreach($allowedKeys as $key => $defaultLabel)
-                        <option value="{{ $key }}" {{ $option->field_key === $key ? 'selected' : '' }}>{{ $defaultLabel }} ({{ $key }})</option>
-                    @endforeach
-                </select>
+                <input type="hidden" class="vis-row__select" data-field="field_key" value="{{ $option->field_key }}">
                 <select class="vis-row__color-select" data-field="color_class" title="Badge color in blog list">
                     <option value="bg-theme-1"  {{ $option->color_class === 'bg-theme-1'  ? 'selected' : '' }}>🔵 Blue</option>
                     <option value="bg-theme-9"  {{ $option->color_class === 'bg-theme-9'  ? 'selected' : '' }}>🟢 Green</option>
@@ -241,8 +233,7 @@
                     <input type="checkbox" class="vis-active-toggle" {{ $option->is_active ? 'checked' : '' }}>
                     <span class="vis-toggle__slider"></span>
                 </label>
-                <span class="field-key-tag" style="display:none;">{{ $option->field_key }}</span>
-                <button type="button" class="vis-row__delete" title="Remove this option">✕</button>
+                <span class="field-key-tag">{{ $option->field_key }}</span>
             </div>
             @endforeach
         </div>
@@ -255,11 +246,7 @@
         <div class="vis-row" data-id="" data-sort="999">
             <span class="vis-row__drag" title="Drag to reorder">⠿</span>
             <input type="text" class="vis-row__label-input" placeholder="Option label (e.g. Featured App)" value="" data-field="label" required>
-            <select class="vis-row__select" data-field="field_key" title="Maps to DB column">
-                @foreach($allowedKeys as $key => $defaultLabel)
-                    <option value="{{ $key }}">{{ $defaultLabel }} ({{ $key }})</option>
-                @endforeach
-            </select>
+            <input type="hidden" class="vis-row__select" data-field="field_key" value="">
             <select class="vis-row__color-select" data-field="color_class" title="Badge color in blog list">
                 <option value="bg-theme-1">🔵 Blue</option>
                 <option value="bg-theme-9">🟢 Green</option>
@@ -272,7 +259,6 @@
                 <span class="vis-toggle__slider"></span>
             </label>
             <span class="field-key-tag" style="display:none;"></span>
-            <button type="button" class="vis-row__delete" title="Remove this option">✕</button>
         </div>
     </template>
 

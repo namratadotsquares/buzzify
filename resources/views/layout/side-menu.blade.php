@@ -134,11 +134,11 @@
                 
                 @can('blog-list')
                 <li>
-                    <a href="javascript:;" class="side-menu <?php if(Request::segment(1) == 'blog' || Request::segment(1) == 'add-blog' || Request::segment(1) == 'edit-blog' || Request::segment(1) == 'slider' ||  Request::segment(1) == 'edit-blog-translation') { echo 'side-menu--active side-menu--open'; } ?>">
+                    <a href="javascript:;" class="side-menu <?php if(Request::segment(1) == 'blog' || Request::segment(1) == 'add-blog' || Request::segment(1) == 'edit-blog' || Request::segment(1) == 'slider' || Request::segment(1) == 'blog-visibility-options' || Request::segment(1) == 'edit-blog-translation') { echo 'side-menu--active side-menu--open'; } ?>">
                         <div class="side-menu__icon"> <i data-feather="monitor"></i> </div>
                         <div class="side-menu__title"> {{__('admin.blog_post')}} <i data-feather="chevron-down" class="menu__sub-icon"></i> </div>
                     </a>
-                    <ul <?php if(Request::segment(1) == 'blog' || Request::segment(1) == 'add-blog' || Request::segment(1) == 'edit-blog' || Request::segment(1) == 'slider' ||  Request::segment(1) == 'edit-blog-translation') { ?>class="side-menu__sub-open" style="display: block;"<?php }else{ ?> style="display: none;"<?php } ?>>
+                    <ul <?php if(Request::segment(1) == 'blog' || Request::segment(1) == 'add-blog' || Request::segment(1) == 'edit-blog' || Request::segment(1) == 'slider' || Request::segment(1) == 'blog-visibility-options' || Request::segment(1) == 'edit-blog-translation') { ?>class="side-menu__sub-open" style="display: block;"<?php }else{ ?> style="display: none;"<?php } ?>>
                         @can('blog-create')
                         <li>
                             <a href="{{url('/add-blog')}}/{{$layout}}/{{$theme}}" class="side-menu <?php if(Request::segment(1) == 'add-blog') { echo 'side-menu--active'; } ?>">
@@ -169,6 +169,11 @@
                         <li>
                             <a href="{{url('/slider/')}}/{{$layout}}/{{$theme}}" class="side-menu <?php if(isset($_GET['post'])){ if($_GET['post']=='slider'){ echo "side-menu--active"; } } if(Request::segment(1) == 'slider') { echo 'side-menu--active'; } ?>">
                                 <div class="side-menu__title"> {{__('admin.slider_post')}} </div>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="{{url('/blog-visibility-options/')}}/{{$layout}}/{{$theme}}" class="side-menu <?php if(Request::segment(1) == 'blog-visibility-options') { echo 'side-menu--active'; } ?>">
+                                <div class="side-menu__title"> Visibility Options </div>
                             </a>
                         </li>
                     </ul>

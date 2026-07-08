@@ -362,7 +362,9 @@
                                 </td>
                                 <td>
                                     @if (!empty($row->source_published_at))
-                                        @php($sourceTs = strtotime($row->source_published_at))
+                                        @php
+                                            $sourceTs = strtotime($row->source_published_at);
+                                        @endphp
                                         @if ($sourceTs !== false)
                                             <div>{{ date('d-m-Y', $sourceTs) }}</div>
                                             <div>{{ date('h:i A', $sourceTs) }}</div>
