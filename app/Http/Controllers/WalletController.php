@@ -145,14 +145,9 @@ class WalletController extends Controller
         }
 
         if (!empty($post)) {
-            if (Gate::any(['redeem-request-edit', 'redeem-request-status'])) {
-                $post['updated_at'] = date('Y-m-d H:i:s');
-                $id = ProductRequest::editProductRequest($post);
-                $msg = __('message_alerts.record_updated');
-            } else {
-                return response(\Helpers::sendFailureAjaxResponse('User does not have a right permission.'), 403);
-            }
-
+            $post['updated_at'] = date('Y-m-d H:i:s');
+            $id = ProductRequest::editProductRequest($post);
+            $msg = __('message_alerts.record_updated');
             return array('success' => true, 'data' => $id, 'message' => $msg);
         } else {
             return array('success' => false, 'data' => null, 'message' => __('message_alerts.something_went_wrong'));

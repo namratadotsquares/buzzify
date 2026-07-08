@@ -742,51 +742,45 @@ class BlogController extends Controller
                 }
             }
 
-            $imageSize = env('OPENAI_IMAGE_SIZE', '1024x1024');
-            $allowedSizes = ['1024x1024', '1024x1536', '1536x1024', 'auto'];
-            if (!in_array($imageSize, $allowedSizes, true)) {
-                $imageSize = '1024x1024';
-            }
+            // Try models in order of preference depending on what the API key supports
+            $configuredModel = env('OPENAI_IMAGE_MODEL', '');
+            $modelsToTry = $configuredModel
+                ? [$configuredModel]
+                : ['gpt-image-1', 'dall-e-3', 'dall-e-2'];
 
-            $imageModel = env('OPENAI_IMAGE_MODEL', 'dall-e-3');
-            // Accept common aliases/mistypes without breaking requests
-            if (in_array($imageModel, ['gpt-image-1-mini', 'image-1.5-mini', 'gpt-image-1.5-mini'], true)) {
-                $imageModel = 'dall-e-3';
-            }
-
-            $quality = strtolower((string) env('OPENAI_IMAGE_QUALITY', 'hd'));
-            $allowedQualities = ['standard', 'hd']; // Correct for DALL-E 3
-            if (!in_array($quality, $allowedQualities, true)) {
-                $quality = 'standard';
-            }
-
-            // Optional: cap output tokens by forcing a lower quality under budget.
-            $maxOutputTokens = (int) env('OPENAI_IMAGE_MAX_OUTPUT_TOKENS', 0);
-            if ($maxOutputTokens > 0) {
-                $tokenTable = [
-                    'low' => ['1024x1024' => 272, '1024x1536' => 408, '1536x1024' => 400],
-                    'medium' => ['1024x1024' => 1056, '1024x1536' => 1584, '1536x1024' => 1568],
-                    'high' => ['1024x1024' => 4160, '1024x1536' => 6240, '1536x1024' => 6208],
-                ];
-                $sizeKey = $imageSize === 'auto' ? '1536x1024' : $imageSize;
-                foreach (['high', 'medium', 'low'] as $q) {
-                    if (isset($tokenTable[$q][$sizeKey]) && $tokenTable[$q][$sizeKey] <= $maxOutputTokens) {
-                        $quality = $q;
-                        break;
-                    }
+            $response = null;
+            $lastBody = '';
+            foreach ($modelsToTry as $imageModel) {
+                // Set size/quality per model
+                if ($imageModel === 'dall-e-2') {
+                    // dall-e-2: no quality param, supports 256x256/512x512/1024x1024
+                    $imageSize = '1024x1024';
+                    $payload = ['model' => $imageModel, 'prompt' => $prompt, 'n' => 1, 'size' => $imageSize];
+                } elseif ($imageModel === 'dall-e-3') {
+                    // dall-e-3: quality = 'standard' or 'hd'
+                    $imageSize = '1024x1024';
+                    $payload = ['model' => $imageModel, 'prompt' => $prompt, 'n' => 1, 'size' => $imageSize, 'quality' => 'standard'];
+                } else {
+                    // gpt-image-1: quality = 'low', 'medium', 'high', or 'auto'
+                    $imageSize = '1024x1024';
+                    $payload = ['model' => $imageModel, 'prompt' => $prompt, 'n' => 1, 'size' => $imageSize, 'quality' => 'medium'];
                 }
-                if ($maxOutputTokens < 1) {
-                    $quality = 'low';
-                }
-            }
 
-            $response = Http::withToken($apiKey)->post('https://api.openai.com/v1/images/generations', [
-                'model' => $imageModel,
-                'prompt' => $prompt,
-                'n' => 1,
-                'size' => $imageSize,
-                'quality' => $quality,
-            ]);
+                $response = Http::withToken($apiKey)->post('https://api.openai.com/v1/images/generations', $payload);
+                $lastBody = $response->body();
+
+                if ($response->successful()) {
+                    break; // Model worked, stop trying
+                }
+
+                $decodedErr = json_decode($lastBody, true);
+                $errMsg = $decodedErr['error']['message'] ?? '';
+                // If error is "model does not exist", try the next one; otherwise stop
+                if (stripos($errMsg, 'does not exist') === false && stripos($errMsg, 'model_not_found') === false) {
+                    break;
+                }
+                Log::info("AI image: model '{$imageModel}' not available, trying next...");
+            }
 
             if ($response->failed()) {
                 $body = $response->body();
@@ -2827,8 +2821,9 @@ class BlogController extends Controller
                 ],
                 'description_hi' => [
                     'sometimes',
-                    'required',
+                    'nullable',
                     function ($attribute, $value, $fail) {
+                        if (empty(trim((string) strip_tags((string) $value)))) return;
                         $max_word = SiteContent::where('key', 'news_max_words')->first()->value ?? 60;
                         $max_words = $max_word;
                         $words = $this->wordCountClean($value);
