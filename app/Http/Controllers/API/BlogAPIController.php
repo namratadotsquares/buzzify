@@ -23,6 +23,7 @@ use App\Models\BlogCategory;
 use App\Models\Author;
 use DB;
 use App\Models\SiteContent;
+use App\Models\Social;
 use App\Models\StoreViewed;
 use App\Models\SearchLog;
 
@@ -1435,9 +1436,10 @@ class BlogAPIController extends Controller
 
             $personal_category_auto_remove = SiteContent::where('key', 'personal_category_auto_remove')->first();
 
-
+            $social_links = Social::getAllActiveSocial();
 
             $settings = array(
+                'social_links' => $social_links,
                 'app_name' => $app_name->value,
                 'app_image' => $app_image->value,
                 'app_subtitle' => $app_subtitle->value,

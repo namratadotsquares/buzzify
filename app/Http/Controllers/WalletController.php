@@ -19,6 +19,7 @@ use App\Models\EpaperTranslation;
 use Illuminate\Support\Facades\Gate;
 use Auth;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Str;
 
 class WalletController extends Controller
 {
@@ -271,9 +272,7 @@ class WalletController extends Controller
             $postwallet_extra['story_id'] = $id;
             $postwallet_extra['point'] = $request->reward_points;
         }
-        if (!Gate::check('user-story-status')) {
-            return back()->with('error', 'User does not have permission to change story status.');
-        }
+
 
         $post['status'] = $status;
         $post['id'] = $id;
@@ -317,7 +316,16 @@ class WalletController extends Controller
             }
 
             $file = $story->file;
-            $fileType = pathinfo($file, PATHINFO_EXTENSION);
+            
+            // Check if $file is a JSON array and decode it to get the first file
+            if (is_string($file) && Str::startsWith(trim($file), '[')) {
+                $decodedFiles = json_decode($file, true);
+                if (is_array($decodedFiles) && count($decodedFiles) > 0) {
+                    $file = $decodedFiles[0];
+                }
+            }
+
+            $fileType = strtolower(pathinfo($file, PATHINFO_EXTENSION));
 
             if (in_array($fileType, ['jpg', 'jpeg', 'png', 'gif'])) {
                 $storyti = strip_tags($story->story);
@@ -334,7 +342,7 @@ class WalletController extends Controller
                 $blog['created_at'] = date('Y-m-d H:i:s');
                 //$blog['post_id'] = null;
                 $blog['story_status'] = (int) $id;
-                $blog['status'] = 2; // Save as Draft
+                $blog['status'] = 1; // Save as Active so it appears in buzz
                 $blog['created_by'] = $user_id;
                 $blog['schedule_date'] = null;
                 $blId = $blog->save();
@@ -398,6 +406,45 @@ class WalletController extends Controller
         }
         Story::updateEpaper($post);
         if ($status == 1) {
+            
+            // Send push notification and in-app notification to the user
+            $user = \App\Models\User::find($user_id);
+            if ($user) {
+                $tokens = [];
+                if (!empty($user->fcm_token)) {
+                    $tokens[] = $user->fcm_token;
+                } elseif (!empty($user->device_token)) {
+                    $tokens[] = $user->device_token;
+                }
+                
+                $notiTitle = "Story Published";
+                $notiDesc = "Your story has been approved and published in the buzz section.";
+                
+                if (!empty($tokens)) {
+                    $image = '';
+                    if (file_exists(public_path() . "/upload/logo/" . setting('site_logo'))) {
+                        $image = url('upload/logo') . '/' . setting('site_logo');
+                    } else {
+                        $image = url('upload/no-image.png');
+                    }
+                    \Helpers::sendNotification($tokens, $notiDesc, $notiTitle, setting('firebase_msg_key'), $image, $blId ?? null);
+                }
+                
+                \App\Models\Notification::create([
+                    'user_id' => $user_id,
+                    'title' => $notiTitle,
+                    'decs' => $notiDesc,
+                ]);
+
+                \App\Models\CustomNotification::create([
+                    'user_id' => $user_id,
+                    'title' => $notiTitle,
+                    'desc' => $notiDesc,
+                    'post_id' => $blId ?? null,
+                    'type' => 'User',
+                ]);
+            }
+
             return response()->json([
                 'status' => 'success',
                 'message' => __('message_alerts.status_changed_success'),
