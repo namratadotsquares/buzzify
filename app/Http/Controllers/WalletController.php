@@ -342,7 +342,7 @@ class WalletController extends Controller
                 $blog['created_at'] = date('Y-m-d H:i:s');
                 //$blog['post_id'] = null;
                 $blog['story_status'] = (int) $id;
-                $blog['status'] = 1; // Save as Active so it appears in buzz
+                $blog['status'] = 0; // Save as Draft so it appears in buzz but as draft status
                 $blog['created_by'] = $user_id;
                 $blog['schedule_date'] = null;
                 $blId = $blog->save();

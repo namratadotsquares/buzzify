@@ -785,6 +785,7 @@ class UserFeedController extends Controller
                 $row->is_bookmark = 0;
             }
             $row->view_count = BlogViewCount::where('blog_id', $row->id)->count();
+            $row->story_view_count = \App\Models\StoryViewCount::where('story_id', $row->id)->count();
             $total_votes = Vote::where('blog_id', $row->id)->count();
             $yes_votes = Vote::where('blog_id', $row->id)->where('vote', 1)->count();
             $no_votes = Vote::where('blog_id', $row->id)->where('vote', 0)->count();

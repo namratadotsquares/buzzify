@@ -49,6 +49,7 @@ Route::post('register', 'UserAPIController@register');
 Route::post('feedback', 'UserAPIController@feedback');
 
 Route::post('send-story', 'UserAPIController@save_story');
+Route::post('increaseStoryViewCount', 'UserAPIController@increaseStoryViewCount');
 Route::get('notificationEnabled', 'UserAPIController@notificationEnabled');
 Route::get('notificationEnabledUser', 'UserAPIController@notificationEnabledUser');
 Route::get('notificationCount', 'UserAPIController@notificationCount');

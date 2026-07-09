@@ -23,6 +23,7 @@ use Illuminate\Support\Facades\Mail;
 use App\Models\DeviceToken;
 use App\Models\Notification;
 use App\Models\CustomNotification;
+use App\Models\StoryViewCount;
 use App\Models\BlogTranslation;
 use App\Models\SiteContent;
 use Illuminate\Support\Facades\Validator;
@@ -541,6 +542,9 @@ class UserAPIController extends Controller
                 }
             }
             $paper = Story::getuserstory($request->user_id);
+            foreach ($paper as $row) {
+                $row->view_count = \App\Models\StoryViewCount::where('story_id', $row->id)->count();
+            }
             return $this->sendResponse($paper, __('message_alerts.record_found'));
         } catch (\Exception $e) {
             return $this->sendError($e->getMessage(), 401);
@@ -721,6 +725,53 @@ class UserAPIController extends Controller
             }
         } catch (\Exception $ex) {
             return response(\Helpers::sendFailureAjaxResponse(__('message_alerts.there_is_an_error')));
+        }
+    }
+
+    public function increaseStoryViewCount(Request $request)
+    {
+        try {
+            $post = $request->all();
+            $validate = [
+                'story_id' => 'required',
+            ];
+            $validator = Validator::make($post, $validate);
+
+            if ($validator->fails()) {
+                $data['error'] = $validator->errors();
+                return response(\Helpers::sendFailureAjaxResponse($data['error']));
+            } else {
+                $alreadyViewed = StoryViewCount::where('story_id', $post['story_id']);
+                
+                if (isset($post['user_id']) && !empty($post['user_id']) && isset($post['device_id']) && !empty($post['device_id'])) {
+                    $alreadyViewed = $alreadyViewed->where('user_id', $post['user_id'])->where('device_id', $post['device_id']);
+                } else if (isset($post['user_id']) && !empty($post['user_id'])) {
+                    $alreadyViewed = $alreadyViewed->where('user_id', $post['user_id'])->where('device_id', null);
+                } else if (isset($post['device_id']) && !empty($post['device_id'])) {
+                    $alreadyViewed = $alreadyViewed->where('device_id', $post['device_id'])->where('user_id', null);
+                }
+                
+                $alreadyViewed = $alreadyViewed->count();
+
+                if ($alreadyViewed) {
+                    return $this->sendResponse([], __('message_alerts.already_viewed'));
+                } else {
+                    $storyView = StoryViewCount::insertGetId([
+                        'user_id' => $post['user_id'] ?? null, 
+                        'story_id' => $post['story_id'], 
+                        'action' => $post['action'] ?? 'view', 
+                        'device_id' => $post['device_id'] ?? null
+                    ]);
+
+                    if ($storyView) {
+                        return $this->sendResponse($storyView, __('message_alerts.successfully_viewed'));
+                    } else {
+                        return $this->sendError($storyView, 500);
+                    }
+                }
+            }
+        } catch (\Exception $ex) {
+            return $this->sendError($ex->getMessage(), 401);
         }
     }
 
