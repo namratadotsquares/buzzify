@@ -544,6 +544,7 @@ class UserAPIController extends Controller
             $paper = Story::getuserstory($request->user_id);
             foreach ($paper as $row) {
                 $row->view_count = \App\Models\StoryViewCount::where('story_id', $row->id)->count();
+                $row->story_view_count = \App\Models\StoryViewCount::where('story_id', $row->id)->count();
             }
             return $this->sendResponse($paper, __('message_alerts.record_found'));
         } catch (\Exception $e) {

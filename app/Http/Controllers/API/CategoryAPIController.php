@@ -534,6 +534,7 @@ class CategoryAPIController extends Controller
                         $yes_votes = Vote::where('blog_id', $detail->id)->where('vote', 1)->count();
                         $no_votes = Vote::where('blog_id', $detail->id)->where('vote', 0)->count();
                         $detail->view_count = BlogViewCount::where('blog_id', $detail->id)->count();
+                        $detail->story_view_count = \App\Models\StoryViewCount::where('story_id', $detail->id)->count();
                         if ($yes_votes != 0) {
                             $yes_percent = ($yes_votes / $total_votes) * 100;
                         } else {
@@ -820,6 +821,7 @@ class CategoryAPIController extends Controller
                         $yes_votes = Vote::where('blog_id', $detail->id)->where('vote', 1)->count();
                         $no_votes = Vote::where('blog_id', $detail->id)->where('vote', 0)->count();
                         $detail->view_count = BlogViewCount::where('blog_id', $detail->id)->count();
+                        $detail->story_view_count = \App\Models\StoryViewCount::where('story_id', $detail->id)->count();
                         if ($yes_votes != 0) {
                             $yes_percent = ($yes_votes / $total_votes) * 100;
                         } else {
@@ -1287,6 +1289,7 @@ class CategoryAPIController extends Controller
                         $yes_votes = Vote::where('blog_id', $detail->id)->where('vote', 1)->count();
                         $no_votes = Vote::where('blog_id', $detail->id)->where('vote', 0)->count();
                         $detail->view_count = BlogViewCount::where('blog_id', $detail->id)->count();
+                        $detail->story_view_count = \App\Models\StoryViewCount::where('story_id', $detail->id)->count();
                         if ($yes_votes != 0) {
                             $yes_percent = ($yes_votes / $total_votes) * 100;
                         } else {
