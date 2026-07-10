@@ -68,6 +68,18 @@ return [
 
       'news_api_language' => [ 
             'en'=>'English',
+            'hi'=>'Hindi',
+            'bn'=>'Bengali',
+            'te'=>'Telugu',
+            'mr'=>'Marathi',
+            'ta'=>'Tamil',
+            'ur'=>'Urdu',
+            'gu'=>'Gujarati',
+            'kn'=>'Kannada',
+            'ml'=>'Malayalam',
+            'or'=>'Odia',
+            'pa'=>'Punjabi',
+            'as'=>'Assamese',
             'ar'=>'Arabic',
             'de'=>'German',
             'es'=>'Spanish',
@@ -81,7 +93,6 @@ return [
             'se'=>'Northern Sami',
             'ud'=>'ud',
             'zh'=>'Chinese',
-            'hi'=>'Hindi'
       ],
 
       'admin_prefix'=>'admin',

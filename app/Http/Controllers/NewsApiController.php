@@ -325,17 +325,33 @@ class NewsApiController extends Controller
 		}
 
 		if (true) { // Perform search by default
-			$lang = $request->input('language', '');
+			$lang = $request->input('language', 'en');
 			if (strlen($lang) === 2) {
-				$langMapping = ['en' => 'eng', 'hi' => 'hin', 'ar' => 'ara', 'de' => 'deu', 'es' => 'spa', 'fr' => 'fra', 'he' => 'heb', 'it' => 'ita', 'nl' => 'nld', 'no' => 'nor', 'pt' => 'por', 'ru' => 'rus', 'se' => 'sme', 'zh' => 'zho'];
+				$langMapping = [
+				    'en' => 'eng', 'hi' => 'hin', 'bn' => 'ben', 'te' => 'tel',
+				    'mr' => 'mar', 'ta' => 'tam', 'gu' => 'guj', 'kn' => 'kan',
+				    'ml' => 'mal', 'pa' => 'pan', 'or' => 'ori', 'as' => 'asm',
+				    'ar' => 'ara', 'de' => 'deu', 'es' => 'spa', 'fr' => 'fra', 
+				    'he' => 'heb', 'it' => 'ita', 'nl' => 'nld', 'no' => 'nor', 
+				    'pt' => 'por', 'ru' => 'rus', 'se' => 'sme', 'zh' => 'zho'
+				];
 				$lang = $langMapping[$lang] ?? $lang;
 			}
 
 			$perPage = $request->input('per_page', 100);
 			$page = $request->input('page', 1);
+
+			$fromDate = $request->input('from', date('Y-m-d'));
+			$fromTime = $request->input('from_time', '00:00');
+
+			$toDate = $request->input('to', date('Y-m-d'));
+			$toTime = $request->input('to_time', '23:59');
+
 			$params = [
-				'dateStart' => $request->input('from'),
-				'dateEnd' => $request->input('to'),
+				'dateStart' => $fromDate,
+				'timeStart' => $fromTime . ':00',
+				'dateEnd' => $toDate,
+				'timeEnd' => $toTime . ':59',
 				'articlesCount' => $perPage,
 				'articlesPage' => $page,
 				'articlesSortBy' => $request->input('articlesSortBy', 'date'),
@@ -386,6 +402,16 @@ class NewsApiController extends Controller
 			$result = $this->fetchEventRegistryNews($params, true);
 
 			if (isset($result['articles']['results'])) {
+				$startDateTime = strtotime($fromDate . ' ' . $fromTime . ':00');
+				$endDateTime = strtotime($toDate . ' ' . $toTime . ':59');
+
+				$result['articles']['results'] = array_filter($result['articles']['results'], function($article) use ($startDateTime, $endDateTime) {
+					$pubDateStr = $article['dateTimePub'] ?? ($article['date'] ?? null);
+					if (!$pubDateStr) return false;
+					$pubTime = strtotime($pubDateStr);
+					return $pubTime >= $startDateTime && $pubTime <= $endDateTime;
+				});
+
 				$totalResults = $result['articles']['totalResults'] ?? 0;
 				$currentPage = $result['articles']['page'] ?? 1;
 
@@ -1044,7 +1070,9 @@ EOT;
 				'locationUri' => $params['locationUri'] ?? $request->input('locationUri'),
 				'lang' => $params['lang'] ?? $request->input('lang'),
 				'dateStart' => $params['dateStart'] ?? $request->input('dateStart'),
+				'timeStart' => $params['timeStart'] ?? $request->input('timeStart'),
 				'dateEnd' => $params['dateEnd'] ?? $request->input('dateEnd'),
+				'timeEnd' => $params['timeEnd'] ?? $request->input('timeEnd'),
 				'sentimentMin' => $params['sentimentMin'] ?? $request->input('sentimentMin'),
 				'sentimentMax' => $params['sentimentMax'] ?? $request->input('sentimentMax'),
 				'isDuplicate' => $params['isDuplicate'] ?? $request->input('isDuplicate', 'skipDuplicates'),

@@ -150,9 +150,10 @@
                 <div class="col-span-12 md:col-span-3">
                     <label class="form-label">{{__('admin.language') ?? 'Language'}}</label>
                     <select class="input form-input-custom" name="language">
+                        @php $selectedLang = request('language', 'en'); @endphp
                         <option value="">{{__('admin.all_language')}}</option>
                         @foreach($news_api_language as $key => $value)
-                            <option value="{{$key}}" @if(request('language') == $key) selected @endif>{{$value}}</option>
+                            <option value="{{$key}}" @if($selectedLang == $key) selected @endif>{{$value}}</option>
                         @endforeach
                     </select>
                 </div>
@@ -258,16 +259,26 @@
                     </select>
                 </div>
 
-                <!-- Row 4: Date Range, Actions -->
+                <!-- Row 4: Date Range -->
                 <div class="col-span-12 md:col-span-3">
                     <label class="form-label">From Date</label>
-                    <input type="text" class="input form-input-custom datepicker" name="from" placeholder="YYYY-MM-DD" @if(isset($_GET['from'])) value="{{$_GET['from']}}" @endif>
+                    <input type="text" class="input form-input-custom datepicker" name="from" placeholder="YYYY-MM-DD" @if(isset($_GET['from'])) value="{{$_GET['from']}}" @else value="{{ date('Y-m-d') }}" @endif>
                 </div>
                 <div class="col-span-12 md:col-span-3">
                     <label class="form-label">To Date</label>
-                    <input type="text" class="input form-input-custom datepicker" name="to" placeholder="YYYY-MM-DD" @if(isset($_GET['to'])) value="{{$_GET['to']}}" @endif>
+                    <input type="text" class="input form-input-custom datepicker" name="to" placeholder="YYYY-MM-DD" @if(isset($_GET['to'])) value="{{$_GET['to']}}" @else value="{{ date('Y-m-d') }}" @endif>
                 </div>
-                <div class="col-span-12 md:col-span-6 flex items-end justify-end gap-2">
+                <div class="col-span-12 md:col-span-3">
+                    <label class="form-label">From Time</label>
+                    <input type="time" class="input form-input-custom" name="from_time" @if(isset($_GET['from_time'])) value="{{$_GET['from_time']}}" @else value="00:00" @endif>
+                </div>
+                <div class="col-span-12 md:col-span-3">
+                    <label class="form-label">To Time</label>
+                    <input type="time" class="input form-input-custom" name="to_time" @if(isset($_GET['to_time'])) value="{{$_GET['to_time']}}" @else value="23:59" @endif>
+                </div>
+                
+                <!-- Row 5: Actions -->
+                <div class="col-span-12 flex items-end justify-end gap-2 mt-2">
                     <button type="button" class="button border text-gray-700 dark:bg-dark-5 dark:text-gray-300 flex items-center h-10 px-6" onclick="resetFilter()">
                         <i data-feather="rotate-ccw" class="w-4 h-4 mr-2"></i> {{__('admin.reset')}}
                     </button>
