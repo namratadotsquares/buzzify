@@ -79,7 +79,12 @@
             border-radius: 8px;
         }
         .toolbar-reset-btn {
-            width: 180px;
+            width: 100%;
+        }
+        @media (min-width: 1025px) {
+            .toolbar-reset-btn {
+                width: 180px;
+            }
         }
         @media (max-width: 1024px) {
             .toolbar-filters {
@@ -88,7 +93,14 @@
         }
         @media (max-width: 720px) {
             .toolbar-filters {
-                grid-template-columns: repeat(2, minmax(140px, 1fr));
+                grid-template-columns: repeat(2, 1fr);
+            }
+            .toolbar-filters .input, 
+            .toolbar-filters select, 
+            .toolbar-filters .button,
+            .toolbar-reset-btn {
+                width: 100%;
+                min-width: 0;
             }
         }
 
@@ -192,7 +204,7 @@
     @include('../layout/components/top-bar')
     <h2 class="intro-y text-lg font-medium mt-10">{{ __('admin.blog_list') }}</h2>
     <div class="grid grid-cols-12 gap-6 mt-5">
-        <div class="intro-y col-span-12">
+        <div class="intro-y col-span-12 min-w-0">
             <div class="blog-toolbar">
                 <div class="toolbar-filters">
                     <form method="GET" style="display: contents;">
@@ -253,7 +265,7 @@
                 </div>
             </div>
         </div>
-        <div class="intro-y col-span-12 overflow-auto lg:overflow-visible table-manage">
+        <div class="intro-y col-span-12 overflow-x-auto w-full min-w-0 lg:overflow-visible table-manage">
             <table class="table table-report -mt-2">
                 <thead>
                     <tr>
@@ -547,12 +559,12 @@
                 </div>
             </div>
         </div>
-        <div class="intro-y col-span-12 md:col-span-8 flex flex-wrap sm:flex-row sm:flex-no-wrap items-center">
+        <div class="intro-y col-span-12 md:col-span-8 flex flex-wrap sm:flex-row sm:flex-no-wrap items-center min-w-0 overflow-x-auto">
             <ul class="pagination">
                 {!! $blog->appends(request()->except('page'))->render() !!}
             </ul>
         </div>
-        <div class="intro-y col-span-12 md:col-span-1 flex flex-wrap sm:flex-row sm:flex-no-wrap items-center ml-5" style="color:black">
+        <div class="intro-y col-span-12 md:col-span-1 flex flex-wrap sm:flex-row sm:flex-no-wrap items-center ml-5 min-w-0" style="color:black">
             <?php $entry_count = isset($_GET['per_page']) ? $_GET['per_page'] : config('constant.paginate.num_per_page'); ?>
             <form>
                 <select id="pagination" class="form-select">
@@ -594,7 +606,7 @@
                 </select>
             </form>
         </div>
-        <div class="intro-y col-span-12 md:col-span-3 sm:flex-row sm:flex-no-wrap items-right">
+        <div class="intro-y col-span-12 md:col-span-3 sm:flex-row sm:flex-no-wrap items-right min-w-0 overflow-hidden text-ellipsis">
             <p class="text-right">
                 <?php if ($blog->firstItem() != null) { ?> {{ __('admin.showing') }} {{ $blog->firstItem() }}
                 {{ __('admin.to') }} {{ $blog->lastItem() }} {{ __('admin.of') }} {{ $blog->total() }}
