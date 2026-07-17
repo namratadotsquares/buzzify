@@ -1430,6 +1430,7 @@ class BlogAPIController extends Controller
             $news_view_time = SiteContent::where('key', 'time_for_news_view')->first();
 
             $personal_category_auto_remove = SiteContent::where('key', 'personal_category_auto_remove')->first();
+            $story_view_visibility = SiteContent::where('key', 'story_view_visibility')->first();
 
             $social_links = Social::getAllActiveSocial();
             foreach ($social_links as $link) {
@@ -1461,7 +1462,8 @@ class BlogAPIController extends Controller
                 'news_view_time' => $news_view_time->value,
                 'ads_show_after_news' => $after_news_ads->value,
 
-                'personal_category_auto_remove' => $personal_category_auto_remove->value
+                'personal_category_auto_remove' => $personal_category_auto_remove->value,
+                'story_view_visibility' => $story_view_visibility ? $story_view_visibility->value : '1'
             );
 
             //$settings = array('app_name'=>$app_name->value,'app_image'=>$app_image->value,'app_subtitle'=>$app_subtitle->value);
