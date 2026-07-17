@@ -262,6 +262,7 @@ class CategoryAPIController extends Controller
                         $query->whereNotIn('id', $readids);
                     })
                     ->orderBy('created_at', 'DESC')
+                    ->orderBy('id', 'DESC')
                     ->paginate($pagination_no)
                     ->appends('per_page', $pagination_no);
 
@@ -476,6 +477,7 @@ class CategoryAPIController extends Controller
                         $query->whereNotIn('id', $readids);
                     })
                     ->orderBy('created_at', 'DESC')
+                    ->orderBy('id', 'DESC')
                     ->paginate($pagination_no)
                     ->appends('per_page', $pagination_no);
 
@@ -534,7 +536,11 @@ class CategoryAPIController extends Controller
                         $yes_votes = Vote::where('blog_id', $detail->id)->where('vote', 1)->count();
                         $no_votes = Vote::where('blog_id', $detail->id)->where('vote', 0)->count();
                         $detail->view_count = BlogViewCount::where('blog_id', $detail->id)->count();
-                        $detail->story_view_count = \App\Models\StoryViewCount::where('story_id', $detail->id)->count();
+                        static $isStoryViewVisible = null;
+                        if ($isStoryViewVisible === null) {
+                            $isStoryViewVisible = \App\Models\SiteContent::where('key', 'story_view_visibility')->value('value') ?? '1';
+                        }
+                        $detail->story_view_count = $isStoryViewVisible == '1' ? \App\Models\StoryViewCount::where('story_id', $detail->id)->count() : 0;
                         if ($yes_votes != 0) {
                             $yes_percent = ($yes_votes / $total_votes) * 100;
                         } else {
@@ -761,6 +767,7 @@ class CategoryAPIController extends Controller
                 }
 
                 $blog = $blog->orderBy('schedule_date', 'DESC')
+                    ->orderBy('id', 'DESC')
                     ->paginate($pagination_no)
                     ->appends(['per_page' => $pagination_no]);
 
@@ -821,7 +828,11 @@ class CategoryAPIController extends Controller
                         $yes_votes = Vote::where('blog_id', $detail->id)->where('vote', 1)->count();
                         $no_votes = Vote::where('blog_id', $detail->id)->where('vote', 0)->count();
                         $detail->view_count = BlogViewCount::where('blog_id', $detail->id)->count();
-                        $detail->story_view_count = \App\Models\StoryViewCount::where('story_id', $detail->id)->count();
+                        static $isStoryViewVisible = null;
+                        if ($isStoryViewVisible === null) {
+                            $isStoryViewVisible = \App\Models\SiteContent::where('key', 'story_view_visibility')->value('value') ?? '1';
+                        }
+                        $detail->story_view_count = $isStoryViewVisible == '1' ? \App\Models\StoryViewCount::where('story_id', $detail->id)->count() : 0;
                         if ($yes_votes != 0) {
                             $yes_percent = ($yes_votes / $total_votes) * 100;
                         } else {
@@ -1227,7 +1238,7 @@ class CategoryAPIController extends Controller
                     $row->image = url('upload/category/default.png');
                 }
                 $row->blog = array();
-                $blog = Blog::where('status', 1)->whereIn('id', $blog_arr)->where('schedule_date', "<=", date("Y-m-d H:i:s"))->with('blog_category')->orderBy('schedule_date', 'DESC')->paginate($pagination_no)->appends('per_page', $pagination_no);
+                $blog = Blog::where('status', 1)->whereIn('id', $blog_arr)->where('schedule_date', "<=", date("Y-m-d H:i:s"))->with('blog_category')->orderBy('schedule_date', 'DESC')->orderBy('id', 'DESC')->paginate($pagination_no)->appends('per_page', $pagination_no);
                 //
                 if ($blog) {
                     foreach ($blog as $detail) {
@@ -1289,7 +1300,11 @@ class CategoryAPIController extends Controller
                         $yes_votes = Vote::where('blog_id', $detail->id)->where('vote', 1)->count();
                         $no_votes = Vote::where('blog_id', $detail->id)->where('vote', 0)->count();
                         $detail->view_count = BlogViewCount::where('blog_id', $detail->id)->count();
-                        $detail->story_view_count = \App\Models\StoryViewCount::where('story_id', $detail->id)->count();
+                        static $isStoryViewVisible = null;
+                        if ($isStoryViewVisible === null) {
+                            $isStoryViewVisible = \App\Models\SiteContent::where('key', 'story_view_visibility')->value('value') ?? '1';
+                        }
+                        $detail->story_view_count = $isStoryViewVisible == '1' ? \App\Models\StoryViewCount::where('story_id', $detail->id)->count() : 0;
                         if ($yes_votes != 0) {
                             $yes_percent = ($yes_votes / $total_votes) * 100;
                         } else {

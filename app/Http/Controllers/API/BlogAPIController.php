@@ -1432,6 +1432,11 @@ class BlogAPIController extends Controller
             $personal_category_auto_remove = SiteContent::where('key', 'personal_category_auto_remove')->first();
 
             $social_links = Social::getAllActiveSocial();
+            foreach ($social_links as $link) {
+                if (!empty($link->image)) {
+                    $link->image = url('upload/social/' . $link->image);
+                }
+            }
 
             $settings = array(
                 'social_links' => $social_links,

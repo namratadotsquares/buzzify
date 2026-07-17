@@ -606,6 +606,16 @@
                                 @endif
 
                             @endforeach
+                            @if($page == 'news_deletion')
+                                <?php $story_view_visibility = \App\Models\SiteContent::where('key', 'story_view_visibility')->first(); ?>
+                                <div class="mt-3">
+                                    <label>Story View Visibility in App</label>
+                                    <select name="story_view_visibility" class="input w-full border mt-2">
+                                        <option value="1" @if(!$story_view_visibility || $story_view_visibility->value == '1') selected @endif>Enabled</option>
+                                        <option value="0" @if($story_view_visibility && $story_view_visibility->value == '0') selected @endif>Disabled</option>
+                                    </select>
+                                </div>
+                            @endif
                             @can('setting-update')
                             <div class="text-right mt-5">                                        
                                 <button type="submit" class="button w-24 bg-theme-1 text-white" id="createBtn">{{__('admin.save')}}</button>

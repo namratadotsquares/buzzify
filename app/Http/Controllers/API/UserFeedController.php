@@ -152,7 +152,11 @@ class UserFeedController extends Controller
                 $row->is_bookmark = 0;
             }
             $row->view_count = BlogViewCount::where('blog_id', $row->id)->count();
-            $row->story_view_count = \App\Models\StoryViewCount::where('story_id', $row->id)->count();
+            static $isStoryViewVisible = null;
+            if ($isStoryViewVisible === null) {
+                $isStoryViewVisible = \App\Models\SiteContent::where('key', 'story_view_visibility')->value('value') ?? '1';
+            }
+            $row->story_view_count = $isStoryViewVisible == '1' ? \App\Models\StoryViewCount::where('story_id', $row->id)->count() : 0;
             $total_votes = Vote::where('blog_id', $row->id)->count();
             $yes_votes = Vote::where('blog_id', $row->id)->where('vote', 1)->count();
             $no_votes = Vote::where('blog_id', $row->id)->where('vote', 0)->count();
@@ -317,7 +321,11 @@ class UserFeedController extends Controller
             }
 
             $row->view_count = BlogViewCount::where('blog_id', $row->id)->count();
-            $row->story_view_count = \App\Models\StoryViewCount::where('story_id', $row->id)->count();
+            static $isStoryViewVisible = null;
+            if ($isStoryViewVisible === null) {
+                $isStoryViewVisible = \App\Models\SiteContent::where('key', 'story_view_visibility')->value('value') ?? '1';
+            }
+            $row->story_view_count = $isStoryViewVisible == '1' ? \App\Models\StoryViewCount::where('story_id', $row->id)->count() : 0;
 
             $total_votes = Vote::where('blog_id', $row->id)->count();
             $yes_votes = Vote::where('blog_id', $row->id)->where('vote', 1)->count();
@@ -421,6 +429,7 @@ class UserFeedController extends Controller
                 ->havingRaw("distance <= ?", [$radius])
                 ->orderBy("distance", "ASC")
                 ->orderBy("schedule_date", "DESC")
+                ->orderBy("id", "DESC")
                 ->paginate($pagination_no)
                 ->appends(['per_page' => $pagination_no]);
         }
@@ -481,7 +490,11 @@ class UserFeedController extends Controller
                 $row->is_bookmark = 0;
             }
             $row->view_count = BlogViewCount::where('blog_id', $row->id)->count();
-            $row->story_view_count = \App\Models\StoryViewCount::where('story_id', $row->id)->count();
+            static $isStoryViewVisible = null;
+            if ($isStoryViewVisible === null) {
+                $isStoryViewVisible = \App\Models\SiteContent::where('key', 'story_view_visibility')->value('value') ?? '1';
+            }
+            $row->story_view_count = $isStoryViewVisible == '1' ? \App\Models\StoryViewCount::where('story_id', $row->id)->count() : 0;
             $total_votes = Vote::where('blog_id', $row->id)->count();
             $yes_votes = Vote::where('blog_id', $row->id)->where('vote', 1)->count();
             $no_votes = Vote::where('blog_id', $row->id)->where('vote', 0)->count();
@@ -622,6 +635,7 @@ class UserFeedController extends Controller
                     ->havingRaw("distance <= ?", [$radius])
                     ->orderBy("distance", "ASC")
                     ->orderBy("schedule_date", "DESC")
+                    ->orderBy("id", "DESC")
                     ->paginate($pagination_no)
                     ->appends(['per_page' => $pagination_no]);
             } else {
@@ -663,6 +677,7 @@ class UserFeedController extends Controller
                 }
 
                 $blog = $blogQuery->orderBy('schedule_date', 'DESC')
+                    ->orderBy('id', 'DESC')
                     ->paginate($pagination_no)
                     ->appends('per_page', $pagination_no);
             } else if (isset($search['category_ids']) && !empty($search['category_ids'])) {
@@ -694,6 +709,7 @@ class UserFeedController extends Controller
                 }
 
                 $blog = $blogQuery->orderBy('schedule_date', 'DESC')
+                    ->orderBy('id', 'DESC')
                     ->paginate($pagination_no)
                     ->appends('per_page', $pagination_no);
             } else {
@@ -711,6 +727,7 @@ class UserFeedController extends Controller
                 }
 
                 $blog = $blogQuery->orderBy('schedule_date', 'DESC')
+                    ->orderBy('id', 'DESC')
                     ->paginate($pagination_no)->appends('per_page', $pagination_no);
             }
         }
@@ -788,7 +805,11 @@ class UserFeedController extends Controller
                 $row->is_bookmark = 0;
             }
             $row->view_count = BlogViewCount::where('blog_id', $row->id)->count();
-            $row->story_view_count = \App\Models\StoryViewCount::where('story_id', $row->id)->count();
+            static $isStoryViewVisible = null;
+            if ($isStoryViewVisible === null) {
+                $isStoryViewVisible = \App\Models\SiteContent::where('key', 'story_view_visibility')->value('value') ?? '1';
+            }
+            $row->story_view_count = $isStoryViewVisible == '1' ? \App\Models\StoryViewCount::where('story_id', $row->id)->count() : 0;
             $total_votes = Vote::where('blog_id', $row->id)->count();
             $yes_votes = Vote::where('blog_id', $row->id)->where('vote', 1)->count();
             $no_votes = Vote::where('blog_id', $row->id)->where('vote', 0)->count();
@@ -946,7 +967,11 @@ class UserFeedController extends Controller
                 $row->is_bookmark = 0;
             }
             $row->view_count = BlogViewCount::where('blog_id', $row->id)->count();
-            $row->story_view_count = \App\Models\StoryViewCount::where('story_id', $row->id)->count();
+            static $isStoryViewVisible = null;
+            if ($isStoryViewVisible === null) {
+                $isStoryViewVisible = \App\Models\SiteContent::where('key', 'story_view_visibility')->value('value') ?? '1';
+            }
+            $row->story_view_count = $isStoryViewVisible == '1' ? \App\Models\StoryViewCount::where('story_id', $row->id)->count() : 0;
             $total_votes = Vote::where('blog_id', $row->id)->count();
             $yes_votes = Vote::where('blog_id', $row->id)->where('vote', 1)->count();
             $no_votes = Vote::where('blog_id', $row->id)->where('vote', 0)->count();
