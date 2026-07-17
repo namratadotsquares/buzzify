@@ -496,6 +496,7 @@ $(document).ready(function(){
                 if(skipped) messages.push(skipped + ' skipped');
                 if(failed) messages.push(failed + ' failed');
                 alert(messages.join(', '));
+                window.location.href = "{{ route('blog', ['layout' => 'side-menu', 'theme' => 'light']) }}";
             }
         }).catch(err=>{ console.error(err); alert('Request failed'); });
     }
