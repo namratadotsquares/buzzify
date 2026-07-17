@@ -11,6 +11,18 @@ class Notification extends Model
 
     protected $fillable = ['user_id', 'title', 'decs', 'notificationId', 'image', 'created_at', 'updated_at'];
 
+    protected $appends = ['post_id', 'desc'];
+
+    public function getPostIdAttribute()
+    {
+        return $this->notificationId;
+    }
+
+    public function getDescAttribute()
+    {
+        return $this->decs;
+    }
+
     public function users()
     {
         return $this->hasOne(User::class, 'id', 'user_id');
