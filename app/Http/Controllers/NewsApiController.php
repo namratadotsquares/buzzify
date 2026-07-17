@@ -505,6 +505,15 @@ class NewsApiController extends Controller
 			shuffle($category_list);
 			$categorys = "- " . implode("\n- ", $category_list);
 			$post = $request->all();
+			if (isset($post['title'])) {
+				$post['title'] = html_entity_decode($post['title'], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+			}
+			if (isset($post['description'])) {
+				$post['description'] = html_entity_decode($post['description'], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+			}
+			if (isset($post['content'])) {
+				$post['content'] = html_entity_decode($post['content'], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+			}
 			// $post['urlToImage'] = strtok($post['urlToImage'], '?'); // Use original URL
 
 			$slug = \Helpers::createSlug($post['title'], 'blog', 0, false);
@@ -673,6 +682,15 @@ class NewsApiController extends Controller
 		foreach ($posts as $index => $post) {
 			$clientIdx = isset($post['idx']) ? $post['idx'] : $index;
 			try {
+				if (isset($post['title'])) {
+					$post['title'] = html_entity_decode($post['title'], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+				}
+				if (isset($post['description'])) {
+					$post['description'] = html_entity_decode($post['description'], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+				}
+				if (isset($post['content'])) {
+					$post['content'] = html_entity_decode($post['content'], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+				}
 				$post['urlToImage'] = isset($post['urlToImage']) ? strtok($post['urlToImage'], '?') : '';
 				$cleanContent = preg_replace('/\s?\[\+\d+\schars\]$/', '', $post['description'] ?? '');
 				// Ensure it ends with a complete sentence if interrupted

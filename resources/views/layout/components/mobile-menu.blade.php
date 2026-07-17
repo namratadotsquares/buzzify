@@ -70,22 +70,22 @@
                     </li>
                     @endcan
                     <li>
-                        <a href="{{url('/blog')}}/{{$layout}}/{{$theme}}?post=all" class="menu <?php if(isset($_GET['post'])){ if($_GET['post']=='all'){ echo "menu--active"; } } ?>" >
+                        <a href="{{ route('blog', ['layout' => $layout, 'theme' => $theme]) }}?post=all" class="menu <?php if(isset($_GET['post'])){ if($_GET['post']=='all'){ echo "menu--active"; } } ?>" >
                             <div class="menu__title"> {{__('admin.all_post')}} </div>
                         </a>
                     </li>
                     <li>
-                        <a href="{{url('/blog')}}/{{$layout}}/{{$theme}}?post=publish" class="menu <?php if(isset($_GET['post'])){ if($_GET['post']=='publish'){ echo "menu--active"; } } ?>">
+                        <a href="{{ route('blog', ['layout' => $layout, 'theme' => $theme]) }}?post=publish" class="menu <?php if(isset($_GET['post'])){ if($_GET['post']=='publish'){ echo "menu--active"; } } ?>">
                             <div class="menu__title"> {{__('admin.published_post')}} </div>
                         </a>
                     </li>
                     <li>
-                        <a href="{{url('/blog/')}}/{{$layout}}/{{$theme}}?post=unpublish" class="menu <?php if(isset($_GET['post'])){ if($_GET['post']=='unpublish'){ echo "menu--active"; } } ?>">
+                        <a href="{{ route('blog', ['layout' => $layout, 'theme' => $theme]) }}?post=unpublish" class="menu <?php if(isset($_GET['post'])){ if($_GET['post']=='unpublish'){ echo "menu--active"; } } ?>">
                             <div class="menu__title"> {{__('admin.unpublished_post')}} </div>
                         </a>
                     </li>
                     <li>
-                        <a href="{{url('/blog/')}}/{{$layout}}/{{$theme}}?post=draft" class="menu <?php if(isset($_GET['post'])){ if($_GET['post']=='draft'){ echo "menu--active"; } } ?>">
+                        <a href="{{ route('blog', ['layout' => $layout, 'theme' => $theme]) }}?post=draft" class="menu <?php if(isset($_GET['post'])){ if($_GET['post']=='draft'){ echo "menu--active"; } } ?>">
                             <div class="menu__title"> {{__('admin.draft_post')}} </div>
                         </a>
                     </li>

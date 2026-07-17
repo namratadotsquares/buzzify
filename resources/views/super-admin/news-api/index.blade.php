@@ -434,6 +434,15 @@ $(document).ready(function(){
     function collectAndSend() {
         const selected = document.querySelectorAll('.news-select:checked');
         if(selected.length === 0){ alert('Please select at least one article'); return; }
+        
+        const bulkBtn = document.getElementById('bulk-save-btn');
+        let originalContent = '';
+        if (bulkBtn) {
+            originalContent = bulkBtn.innerHTML;
+            bulkBtn.disabled = true;
+            bulkBtn.innerHTML = '<svg width="20" viewBox="0 0 38 38" xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 mr-2"><defs><linearGradient x1="8.042%" y1="0%" x2="65.682%" y2="23.865%" id="a"><stop stop-color="#fff" stop-opacity="0" offset="0%"></stop><stop stop-color="#fff" stop-opacity=".631" offset="63.146%"></stop><stop stop-color="#fff" offset="100%"></stop></linearGradient></defs><g fill="none" fill-rule="evenodd"><g transform="translate(1 1)"><path d="M36 18c0-9.94-8.06-18-18-18" id="Oval-2" stroke="url(#a)" stroke-width="2"><animateTransform attributeName="transform" type="rotate" from="0 18 18" to="360 18 18" dur="0.9s" repeatCount="indefinite"></animateTransform></path><circle fill="#fff" cx="36" cy="18" r="1"><animateTransform attributeName="transform" type="rotate" from="0 18 18" to="360 18 18" dur="0.9s" repeatCount="indefinite"></animateTransform></circle></g></g></svg> Saving...';
+        }
+
         const posts = [];
         selected.forEach((chk) => {
             posts.push({
@@ -459,7 +468,11 @@ $(document).ready(function(){
             },
             body: JSON.stringify({ posts: posts })
         }).then(r=>r.json()).then(res=>{
-            if(!res){ alert('No response'); return; }
+            if(!res){ 
+                if (bulkBtn) { bulkBtn.innerHTML = originalContent; bulkBtn.disabled = false; }
+                alert('No response'); 
+                return; 
+            }
             const results = res.results || [];
             let created = 0, skipped = 0, failed = 0;
             results.forEach(item => {
@@ -489,6 +502,7 @@ $(document).ready(function(){
             });
             // Summary
             if(created === 0 && skipped > 0 && failed === 0){
+                if (bulkBtn) { bulkBtn.innerHTML = originalContent; bulkBtn.disabled = false; }
                 alert('All selected items already exist');
             } else {
                 let messages = [];
@@ -498,7 +512,11 @@ $(document).ready(function(){
                 alert(messages.join(', '));
                 window.location.href = "{{ route('blog', ['layout' => 'side-menu', 'theme' => 'light']) }}";
             }
-        }).catch(err=>{ console.error(err); alert('Request failed'); });
+        }).catch(err=>{ 
+            console.error(err); 
+            if (bulkBtn) { bulkBtn.innerHTML = originalContent; bulkBtn.disabled = false; }
+            alert('Request failed'); 
+        });
     }
 
     const bulkBtn = document.getElementById('bulk-save-btn');

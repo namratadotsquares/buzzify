@@ -147,22 +147,22 @@
                         </li>
                         @endcan
                         <li>
-                            <a href="{{url('/blog')}}/{{$layout}}/{{$theme}}?post=all" class="side-menu <?php if(isset($_GET['post'])){ if($_GET['post']=='all'){ echo "side-menu--active"; } } ?>" >
+                            <a href="{{ route('blog', ['layout' => $layout, 'theme' => $theme]) }}?post=all" class="side-menu <?php if(isset($_GET['post'])){ if($_GET['post']=='all'){ echo "side-menu--active"; } } ?>" >
                                 <div class="side-menu__title"> {{__('admin.all_post')}} </div>
                             </a>
                         </li>
                         <li>
-                            <a href="{{url('/blog')}}/{{$layout}}/{{$theme}}?post=publish" class="side-menu <?php if(isset($_GET['post'])){ if($_GET['post']=='publish'){ echo "side-menu--active"; } } ?>">
+                            <a href="{{ route('blog', ['layout' => $layout, 'theme' => $theme]) }}?post=publish" class="side-menu <?php if(isset($_GET['post'])){ if($_GET['post']=='publish'){ echo "side-menu--active"; } } ?>">
                                 <div class="side-menu__title"> {{__('admin.published_post')}} </div>
                             </a>
                         </li>
                         <li>
-                            <a href="{{url('/blog/')}}/{{$layout}}/{{$theme}}?post=unpublish" class="side-menu <?php if(isset($_GET['post'])){ if($_GET['post']=='unpublish'){ echo "side-menu--active"; } } ?>">
+                            <a href="{{ route('blog', ['layout' => $layout, 'theme' => $theme]) }}?post=unpublish" class="side-menu <?php if(isset($_GET['post'])){ if($_GET['post']=='unpublish'){ echo "side-menu--active"; } } ?>">
                                 <div class="side-menu__title"> {{__('admin.unpublished_post')}} </div>
                             </a>
                         </li>
                         <li>
-                            <a href="{{url('/blog/')}}/{{$layout}}/{{$theme}}?post=draft" class="side-menu <?php if(isset($_GET['post'])){ if($_GET['post']=='draft'){ echo "side-menu--active"; } } ?>">
+                            <a href="{{ route('blog', ['layout' => $layout, 'theme' => $theme]) }}?post=draft" class="side-menu <?php if(isset($_GET['post'])){ if($_GET['post']=='draft'){ echo "side-menu--active"; } } ?>">
                                 <div class="side-menu__title"> {{__('admin.draft_post')}} </div>
                             </a>
                         </li>

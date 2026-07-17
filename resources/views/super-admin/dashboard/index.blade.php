@@ -85,7 +85,7 @@
 
                         @can('blog-list')
 
-                        <a href="{{url('/blog')}}/{{$layout}}/{{$theme}}">
+                        <a href="{{ route('blog', ['layout' => $layout, 'theme' => $theme]) }}">
 
                         @endcan
 
