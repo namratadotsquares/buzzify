@@ -342,7 +342,7 @@ class WalletController extends Controller
                 $blog['created_at'] = date('Y-m-d H:i:s');
                 //$blog['post_id'] = null;
                 $blog['story_status'] = (int) $id;
-                $blog['status'] = 0; // Save as Draft so it appears in buzz but as draft status
+                $blog['status'] = 2; // Save as Draft so it appears in buzz but as draft status
                 $blog['created_by'] = $user_id;
                 $blog['schedule_date'] = null;
                 $blId = $blog->save();
@@ -408,6 +408,8 @@ class WalletController extends Controller
         if ($status == 1) {
             
             // Send push notification and in-app notification to the user
+            // USER REQUESTED NO NOTIFICATION ON ACCEPT/DRAFT STAGE
+            /*
             $user = \App\Models\User::find($user_id);
             if ($user) {
                 $tokens = [];
@@ -444,6 +446,7 @@ class WalletController extends Controller
                     'type' => 'User',
                 ]);
             }
+            */
 
             return response()->json([
                 'status' => 'success',
