@@ -1637,24 +1637,28 @@ function add_social(e, formid) {
     if (data.name != '') {
         if (data.url != '') {
             if (data.icon != '') {
-                $.ajax({
-                    type: 'POST',
-                    url: base_url + "/add-update-social",
-                    headers: {},
-                    contentType: 'application/json',
-                    dataType: 'json',
-                    data: JSON.stringify(data),
-                    success: function (response) {
-                        if (response.success) {
-                            myToastr(response.message, 'success');
-                            setTimeout(function () {
-                                window.location.reload();
-                            }, 500);
-                        } else {
-                            myToastr(response.message, 'error');
+                if (data.thumb_image != undefined && data.thumb_image != '') {
+                    $.ajax({
+                        type: 'POST',
+                        url: base_url + "/add-update-social",
+                        headers: {},
+                        contentType: 'application/json',
+                        dataType: 'json',
+                        data: JSON.stringify(data),
+                        success: function (response) {
+                            if (response.success) {
+                                myToastr(response.message, 'success');
+                                setTimeout(function () {
+                                    window.location.reload();
+                                }, 500);
+                            } else {
+                                myToastr(response.message, 'error');
+                            }
                         }
-                    }
-                });
+                    });
+                } else {
+                    myToastr('Please upload an image', 'error');
+                }
             } else {
                 myToastr('Enter icon', 'error');
             }
@@ -1663,6 +1667,69 @@ function add_social(e, formid) {
         }
     } else {
         myToastr('Enter name', 'error');
+    }
+}
+
+var socialImage;
+function uploadSocialImage(input, previewid, type, id) {
+    if (id) {
+        var createBtn = 'createBtn' + id;
+        var authorimage = 'social_image_' + id;
+    } else {
+        createBtn = 'createBtn';
+        var authorimage = 'social_image';
+    }
+    $('#' + createBtn).prop('disabled', true);
+    $('#' + createBtn).html('<i class="fa fa-spinner fa-spin"></i> Loading');
+    if (input.files && input.files[0]) {
+        var imgPath = input.files[0].name;
+        var extn = imgPath.substring(imgPath.lastIndexOf('.') + 1).toLowerCase();
+        if (extn == "gif" || extn == "png" || extn == "jpg" || extn == "jpeg") {
+            if (typeof (FileReader) != "undefined") {
+                var reader = new FileReader();
+                reader.readAsDataURL(input.files[0]);
+                reader.onload = function (e) {
+                    $.ajaxSetup({
+                        headers: {
+                            'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+                        }
+                    });
+                    if (type == "add") {
+                        $('#' + previewid).attr('src', e.target.result);
+                    } else if (type == "update") {
+                        $('#' + previewid).attr('src', e.target.result);
+                    }
+                    var fd = new FormData();
+                    fd.append('image', input.files[0]);
+                    $.ajax({
+                        url: base_url + '/uploadSocialImage',
+                        data: fd,
+                        processData: false,
+                        contentType: false,
+                        type: 'POST',
+                        dataType: 'json',
+                        success: function (data) {
+                            setTimeout(function () {
+                                socialImage = data.data;
+                                if (socialImage != undefined) {
+                                    $('#' + authorimage).val(socialImage);
+                                    $('#' + createBtn).prop('disabled', false);
+                                    if (id) {
+                                        $('#' + createBtn).html('Update');
+                                    } else {
+                                        $('#' + createBtn).html('Create');
+                                    }
+                                }
+                            }, 10);
+                        }
+                    })
+                };
+            } else {
+                myToastr('Something went wrong', 'error');
+            }
+        } else {
+            myToastr('Please select only image', 'error');
+        }
     }
 }
 

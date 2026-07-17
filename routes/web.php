@@ -359,6 +359,8 @@ Route::middleware('auth')->group(function () {
 
     Route::post('/add-update-social', 'SiteContentController@addUpdateSocial');
 
+    Route::post('/uploadSocialImage', 'SiteContentController@uploadSocialImage');
+
     Route::get('/delete-social/{id}', 'SiteContentController@deleteSocial');
 
     Route::get('/change-status-social/{id}/{status}', 'SiteContentController@changeSocialStatus');

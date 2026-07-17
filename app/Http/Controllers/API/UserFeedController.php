@@ -73,24 +73,20 @@ class UserFeedController extends Controller
                 }
             }
         }
-        $blog = Blog::where('status', 1)->whereIn('id', $blogIdArr)->where('schedule_date', "<=", date("Y-m-d H:i:s"))->with('blog_category')->when($request->input('user_id'), function ($query) use ($request) {
-            $query->whereDoesntHave('viewStories', function ($query) use ($request) {
-                $query->where('user_id', $request->input('user_id')); // Exclude blogs that have a matching user ID in ViewStories
-            });
-        })
-            ->when($device_id, function ($query) use ($device_id, $user_id) {
-                if ($user_id) {
-                    $query->whereDoesntHave('viewStories', function ($query) use ($device_id, $user_id) {
-                        $query->where('device_id', $device_id)
-                            ->where('user_id', $user_id);
-                    });
-                } else {
-                    $query->whereNotIn('id', function ($subQuery) use ($device_id) {
-                        $subQuery->select('blog_id')
-                            ->from('store_viewed')
-                            ->where('device_id', $device_id)->whereNULL('user_id');
-                    });
-                }
+        $blog = Blog::where('status', 1)->whereIn('id', $blogIdArr)->where('schedule_date', "<=", date("Y-m-d H:i:s"))->with('blog_category')
+            ->when(true, function ($query) use ($device_id, $user_id) {
+                $query->whereDoesntHave('viewStories', function ($query) use ($device_id, $user_id) {
+                    if ($user_id && $device_id) {
+                        $query->where(function ($q) use ($user_id, $device_id) {
+                            $q->where('user_id', $user_id)
+                              ->orWhere('device_id', $device_id);
+                        });
+                    } else if ($user_id) {
+                        $query->where('user_id', $user_id);
+                    } else if ($device_id) {
+                        $query->where('device_id', $device_id);
+                    }
+                });
             })->orderBy('schedule_date', 'DESC');
 
         if (!empty($readids)) {
@@ -396,8 +392,10 @@ class UserFeedController extends Controller
         $viewedBlogIds = [];
 
         if (isset($search['device_id']) && !empty($search['device_id']) && $header != null) {
-            $viewedBlogIds = BlogViewCount::where('device_id', $search['device_id'])
-                ->where('user_id', $header)->pluck('blog_id')->toArray();
+            $viewedBlogIds = BlogViewCount::where(function ($query) use ($search, $header) {
+                $query->where('device_id', $search['device_id'])
+                      ->orWhere('user_id', $header);
+            })->pluck('blog_id')->toArray();
         } else if (isset($search['device_id']) && !empty($search['device_id'])) {
             $viewedBlogIds = BlogViewCount::where('device_id', $search['device_id'])
                 ->pluck('blog_id')->toArray();
@@ -575,8 +573,10 @@ class UserFeedController extends Controller
         $viewedBlogIds = [];
 
         if (isset($search['device_id']) && !empty($search['device_id']) && $header != null) {
-            $viewedBlogIds = BlogViewCount::where('device_id', $search['device_id'])
-                ->where('user_id', $header)->pluck('blog_id')->toArray();
+            $viewedBlogIds = BlogViewCount::where(function ($query) use ($search, $header) {
+                $query->where('device_id', $search['device_id'])
+                      ->orWhere('user_id', $header);
+            })->pluck('blog_id')->toArray();
         } else if (isset($search['device_id']) && !empty($search['device_id'])) {
             $viewedBlogIds = BlogViewCount::where('device_id', $search['device_id'])
                 ->pluck('blog_id')->toArray();

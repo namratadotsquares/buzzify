@@ -3266,7 +3266,7 @@ class BlogController extends Controller
                 $blog_data = BlogImages::whereIn('id', $add_blog_image)->get();
 
                 // (notification logic unchanged, kept if you need it)
-                if (isset($postData['is_featured'])) {
+                if (isset($postData['is_featured']) && !in_array($submittype, ['update_only', 'save_keep_status'])) {
                     if ($postData['is_featured'] == 1) {
                         $send_notification = true;
                         $this->sendBlogNotification_unpublish($post['id'], $postData['title']);

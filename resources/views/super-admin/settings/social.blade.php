@@ -54,6 +54,7 @@
                                 <tr>
                                     <th class="whitespace-no-wrap">{{__('admin.id')}}</th>
                                     <th class="whitespace-no-wrap">{{__('admin.name')}}</th>
+                                    <th class="whitespace-no-wrap">{{__('admin.image')}}</th>
                                     <!-- <th class="whitespace-no-wrap">Icon</th> -->
                                     <th class="whitespace-no-wrap width-20"  >{{__('admin.created_at')}}</th>
                                     <th class="text-center whitespace-no-wrap">{{__('admin.status')}}</th>
@@ -78,6 +79,16 @@
                                                 {{$i}}
                                             </td>
                                             <td>{{ $row->name }}</td>
+                                            <td>
+                                                <?php
+                                                    if(isset($row->image) && file_exists(public_path()."/upload/social/".$row->image) && $row->image!='') {
+                                                        $socialurl = url('upload/social').'/'.$row->image;
+                                                    }else{
+                                                        $socialurl = url('upload/no-image.png');
+                                                    }
+                                                ?>
+                                                <img src="{{$socialurl}}" class="thumb-img-list" alt="{{$row->image}}" style="width: 40px; height: 40px; object-fit: contain;" onerror="this.onerror=null;this.src='<?php echo url("upload/no-image.png") ?>';">
+                                            </td>
 
 
                                             <!-- <td><i class="fa {{ $row->icon }}"></i></td> -->
@@ -134,10 +145,28 @@
                                                                     <input type="text" class="input w-full border mt-2 flex-1" name="icon" placeholder="{{__('admin.icon_placeholder')}}" value="{{$row->icon}}">
                                                                 </div>
                                                             </div>
+                                                            <?php
+                                                                if(isset($row->image) && file_exists(public_path()."/upload/social/".$row->image) && $row->image!='') {
+                                                                    $socialurl = url('upload/social').'/'.$row->image;
+                                                                }else{
+                                                                    $socialurl = url('upload/no-image.png');
+                                                                }
+                                                            ?>
+                                                            <div class="social-design grid grid-cols-12 gap-4 row-gap-3">
+                                                                <div class="col-span-12 sm:col-span-12">
+                                                                    <label>{{__('admin.image')}} <span class="text-danger">*</span></label>
+                                                                    <input type="hidden" name="thumb_image" id="social_image_{{$row->id}}" value="{{$row->image}}">
+                                                                    <div class="mt-2 flex items-center">
+                                                                        <input type="button" class="button w-30 bg-theme-1 text-white mr-3" value="{{__('admin.upload_image')}}" onclick="triggerFileInput('socialimageuploadBtn_{{$row->id}}')">
+                                                                        <input class="socialimageuploadBtn_{{$row->id}} hide" type="file" name="social_image_file" onchange="uploadSocialImage(this,'social_image_preview_{{$row->id}}','update','{{$row->id}}');" accept="image/jpg, image/jpeg, image/png"/>
+                                                                        <img onerror="this.onerror=null;this.src='<?php echo url("upload/no-image.png") ?>';" id="social_image_preview_{{$row->id}}" src="{{$socialurl}}" class="width-30" style="max-height: 100px; object-fit: contain;">
+                                                                    </div>
+                                                                </div>
+                                                            </div>
 
                                                             <div class="px-5 py-3 text-right border-t border-gray-200 dark:border-dark-5">
                                                                 <button type="button" data-dismiss="modal" class="button w-20 border text-gray-700 dark:border-dark-5 dark:text-gray-300 mr-1">{{__('admin.cancel')}}</button>
-                                                                <input type="button" class="button w-20 bg-theme-1 text-white" value="{{__('admin.update')}}" onclick="add_social(event,'editsocialform_{{$row->id}}')">
+                                                                <input type="button" id="createBtn{{$row->id}}" class="button w-20 bg-theme-1 text-white" value="{{__('admin.update')}}" onclick="add_social(event,'editsocialform_{{$row->id}}')">
                                                             </div>
                                                         </form>            
                                                     </div>
@@ -214,12 +243,20 @@
                     </div>
                 </div>
                 <div class="social-design grid grid-cols-12 gap-4 row-gap-3">
-                    
+                    <div class="col-span-12 sm:col-span-12">
+                        <label>{{__('admin.image')}} <span class="text-danger">*</span></label>
+                        <input type="hidden" name="thumb_image" id="social_image" value="">
+                        <div class="mt-2 flex items-center">
+                            <input type="button" class="button w-30 bg-theme-1 text-white mr-3" value="{{__('admin.upload_image')}}" onclick="triggerFileInput('socialimageuploadBtn')">
+                            <input class="socialimageuploadBtn hide" type="file" name="social_image_file" onchange="uploadSocialImage(this,'social_image_preview','add',0);" accept="image/jpg, image/jpeg, image/png"/>
+                            <img onerror="this.onerror=null;this.src='<?php echo url("upload/no-image.png") ?>';" id="social_image_preview" src="{{url('upload/no-image.png')}}" class="width-30" style="max-height: 100px; object-fit: contain;">
+                        </div>
+                    </div>
                 </div>
 
                 <div class="px-5 py-3 text-right border-t border-gray-200 dark:border-dark-5">
                     <button type="button" data-dismiss="modal" class="button w-20 border text-gray-700 dark:border-dark-5 dark:text-gray-300 mr-1">{{__('admin.cancel')}}</button>
-                    <input type="button" class="button w-20 bg-theme-1 text-white" value="{{__('admin.create')}}" onclick="add_social(event,'addsocialform')">
+                    <input type="button" id="createBtn" class="button w-20 bg-theme-1 text-white" value="{{__('admin.create')}}" onclick="add_social(event,'addsocialform')">
                 </div>
             </form>            
         </div>

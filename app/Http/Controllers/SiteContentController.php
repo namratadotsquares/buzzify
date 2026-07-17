@@ -808,6 +808,55 @@ class SiteContentController extends Controller
 
 
 
+    public function uploadSocialImage(Request $request)
+    {
+
+        try {
+
+            if ($request->ajax()) {
+
+                $post = $request->all();
+
+                $name = '';
+
+                if ($post['image'] != '') {
+
+                    $file = $request->file('image');
+
+                    $name = time() . rand() . '.' . $file->getClientOriginalExtension();
+
+                    $destination = public_path('/upload/social/') . $name;
+
+                    $basePath = public_path('/upload/social/');
+
+                    if (!file_exists($basePath)) {
+
+                        mkdir($basePath, 0777, true);
+
+                    }
+
+                    $c = \Helpers::compress_image($file, $destination, 30);
+
+                }
+
+                return response(\Helpers::sendSuccessAjaxResponse(__('message_alerts.record_updated'), $name));
+
+            } else {
+
+                return response(\Helpers::sendFailureAjaxResponse(__('message_alerts.invalid_request')));
+
+            }
+
+        } catch (\Exception $ex) {
+
+            return response(\Helpers::sendFailureAjaxResponse(__('message_alerts.there_is_an_error')));
+
+        }
+
+    }
+
+
+
     /**
 
      * Method to delete category

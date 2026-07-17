@@ -324,7 +324,7 @@ class NewsApiController extends Controller
 			}, array_slice($concept_suggest_result, 0, 50));
 		}
 
-		if (true) { // Perform search by default
+		if ($request->has('submitted')) { // Only fetch when user submits the search form
 			$lang = $request->input('language', 'en');
 			if (strlen($lang) === 2) {
 				$langMapping = [
@@ -423,12 +423,12 @@ class NewsApiController extends Controller
 					'name' => $article['source']['title'] ?? 'Unknown'
 					],
 					'author' => $article['authors'][0]['name'] ?? 'Unknown',
-					'title' => $article['title'],
-					'description' => $article['body'],
-					'url' => $article['url'],
+					'title' => html_entity_decode($article['title'] ?? '', ENT_QUOTES | ENT_HTML5, 'UTF-8'),
+					'description' => html_entity_decode($article['body'] ?? '', ENT_QUOTES | ENT_HTML5, 'UTF-8'),
+					'url' => $article['url'] ?? '',
 					'urlToImage' => $article['image'] ?? null,
-					'publishedAt' => $article['dateTimePub'] ?? $article['date'],
-					'content' => $article['body']
+					'publishedAt' => $article['dateTimePub'] ?? ($article['date'] ?? ''),
+					'content' => html_entity_decode($article['body'] ?? '', ENT_QUOTES | ENT_HTML5, 'UTF-8')
 					];
 				}, $result['articles']['results']);
 

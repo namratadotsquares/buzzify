@@ -572,7 +572,7 @@ class BlogAPIController extends Controller
             }
 
             $excludeCategoryId = $request->input('category_id');
-            $user_id = $request->input('$user_id');
+            $user_id = $request->input('user_id');
             $device_id = $request->input('device_id');
             $readids = json_decode($request->input('blog_ids'));
 
@@ -623,24 +623,19 @@ class BlogAPIController extends Controller
                         });
                     }
                 ])
-                ->when($request->input('user_id'), function ($query) use ($request) {
-                    $query->whereDoesntHave('viewStories', function ($query) use ($request) {
-                        $query->where('user_id', $request->input('user_id')); // Exclude blogs that have a matching user ID in ViewStories
+                ->when(true, function ($query) use ($device_id, $user_id) {
+                    $query->whereDoesntHave('viewStories', function ($query) use ($device_id, $user_id) {
+                        if ($user_id && $device_id) {
+                            $query->where(function ($q) use ($user_id, $device_id) {
+                                $q->where('user_id', $user_id)
+                                  ->orWhere('device_id', $device_id);
+                            });
+                        } else if ($user_id) {
+                            $query->where('user_id', $user_id);
+                        } else if ($device_id) {
+                            $query->where('device_id', $device_id);
+                        }
                     });
-                })
-                ->when($device_id, function ($query) use ($device_id, $user_id) {
-                    if ($user_id) {
-                        $query->whereDoesntHave('viewStories', function ($query) use ($device_id, $user_id) {
-                            $query->where('device_id', $device_id)
-                                ->where('user_id', $user_id);
-                        });
-                    } else {
-                        $query->whereNotIn('id', function ($subQuery) use ($device_id) {
-                            $subQuery->select('blog_id')
-                                ->from('store_viewed')
-                                ->where('device_id', $device_id)->whereNULL('user_id');
-                        });
-                    }
                 })
                 ->orderBy('created_at', 'DESC');
 

@@ -119,6 +119,7 @@
     
     <div class="intro-y filter-box mt-5">
         <form method="GET">
+            <input type="hidden" name="submitted" value="1">
             <div class="grid grid-cols-12 gap-x-6 gap-y-4">
                 <!-- Row 1: Concept, Language, DataType, Sort -->
                 <div class="col-span-12 md:col-span-3">
@@ -292,7 +293,7 @@
 
     <div class="intro-y flex items-center justify-between mt-8">
         <h2 class="text-lg font-medium">{{__('admin.search_news_api_post')}} - Results</h2>
-        @can('feed-item-save-post')
+        @can('news-api-post-save')
         <button id="bulk-save-btn" type="button" class="button text-white bg-theme-1 flex items-center gap-2 px-4 shadow-md">
             <i data-feather="save" class="w-4 h-4"></i>
             <span>{{__('admin.save_selected_as_posts') ?? 'Bulk Save'}}</span>
@@ -309,7 +310,7 @@
                         <th class="whitespace-no-wrap">{{__('admin.image')}}</th>
                         <th class="whitespace-no-wrap">{{__('admin.title_desc')}}</th>
                         <th class="whitespace-no-wrap">{{__('admin.published_time')}}</th>
-                        @can('feed-item-save-post')
+                        @can('news-api-post-save')
                         <th class="text-center whitespace-no-wrap">{{__('admin.action')}}</th>
                         @endcan
                     </tr>
@@ -353,7 +354,7 @@
                                         <div class="text-gray-600 text-xs">--</div>
                                     @endif
                                 </td>
-                                @can('feed-item-save-post')
+                                @can('news-api-post-save')
                                 <td class="table-report__action w-56">
                                     <div class="flex justify-center items-center">
                                         <form method="post" action="{{url('save-news-api-post')}}">
@@ -379,10 +380,17 @@
                             </tr>
                             <?php $i++; ?>
                         @endforeach
-                    @else
+                    @elseif(request()->has('submitted'))
                         <tr class="intro-x text-center text-danger">
                             <td class="w-40" colspan="5">
                                 {{__('admin.no_record_found')}}
+                            </td>
+                        </tr>
+                    @else
+                        <tr class="intro-x text-center">
+                            <td class="w-40" colspan="5" style="padding: 2rem; color: #718096;">
+                                <i data-feather="search" style="width:32px;height:32px;margin:0 auto 0.5rem;display:block;"></i>
+                                Use the filters above and click <strong>Search</strong> to fetch news articles.
                             </td>
                         </tr>
                     @endif
