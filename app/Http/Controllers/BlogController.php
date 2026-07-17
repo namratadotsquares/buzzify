@@ -3179,6 +3179,41 @@ class BlogController extends Controller
                     }
                 }
                 $postData['status'] = 1;
+                
+                if ($detail && $detail->story_status > 0 && $detail->created_by) {
+                    $user_id = $detail->created_by;
+                    $user = \App\Models\User::find($user_id);
+                    if ($user) {
+                        $tokens = [];
+                        if (!empty($user->fcm_token)) {
+                            $tokens[] = $user->fcm_token;
+                        } elseif (!empty($user->device_token)) {
+                            $tokens[] = $user->device_token;
+                        }
+                        
+                        $notiTitle = "Story Published";
+                        $notiDesc = "Your story has been approved and published in the buzz section.";
+                        
+                        if (!empty($tokens)) {
+                            $image = '';
+                            if (file_exists(public_path() . "/upload/logo/" . setting('site_logo'))) {
+                                $image = url('upload/logo') . '/' . setting('site_logo');
+                            } else {
+                                $image = url('upload/no-image.png');
+                            }
+                            \Helpers::sendNotification($tokens, $notiDesc, $notiTitle, setting('firebase_msg_key'), $image, $detail->id);
+                        }
+                        
+                        \App\Models\Notification::create([
+                            'user_id' => $user_id,
+                            'title' => $notiTitle,
+                            'decs' => $notiDesc,
+                            'notificationId' => $detail->id,
+                            'image' => $image,
+                        ]);
+                    }
+                }
+
                 if (isset($postData['is_featured'])) {
                     if ($postData['is_featured'] == 1) {
                         $send_notification = true;
@@ -4162,7 +4197,7 @@ class BlogController extends Controller
             return back()->with('error', 'Only admin can change blog status.');
         }
 
-        $blog = Blog::select('id', 'status')->where('id', $id)->first();
+        $blog = Blog::where('id', $id)->first();
         $fromStatus = $blog ? (int) $blog->status : null;
 
         $post['status'] = $status;
@@ -4175,6 +4210,40 @@ class BlogController extends Controller
                 'from_status' => $fromStatus,
                 'to_status' => (int) $status,
             ]);
+            
+            if ($fromStatus == 2 && $status == 1 && $blog->story_status > 0 && $blog->created_by) {
+                $user_id = $blog->created_by;
+                $user = \App\Models\User::find($user_id);
+                if ($user) {
+                    $tokens = [];
+                    if (!empty($user->fcm_token)) {
+                        $tokens[] = $user->fcm_token;
+                    } elseif (!empty($user->device_token)) {
+                        $tokens[] = $user->device_token;
+                    }
+                    
+                    $notiTitle = "Story Published";
+                    $notiDesc = "Your story has been approved and published in the buzz section.";
+                    
+                    if (!empty($tokens)) {
+                        $image = '';
+                        if (file_exists(public_path() . "/upload/logo/" . setting('site_logo'))) {
+                            $image = url('upload/logo') . '/' . setting('site_logo');
+                        } else {
+                            $image = url('upload/no-image.png');
+                        }
+                        \Helpers::sendNotification($tokens, $notiDesc, $notiTitle, setting('firebase_msg_key'), $image, $blog->id);
+                    }
+                    
+                    \App\Models\Notification::create([
+                        'user_id' => $user_id,
+                        'title' => $notiTitle,
+                        'decs' => $notiDesc,
+                        'notificationId' => $blog->id,
+                        'image' => $image,
+                    ]);
+                }
+            }
         }
 
         return back()->with('success', __('message_alerts.status_changed_success'));
