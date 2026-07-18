@@ -306,6 +306,15 @@
                 var tpl = document.getElementById('vis-row-template');
                 var clone = tpl.content.cloneNode(true);
                 var row = clone.querySelector('.vis-row');
+                
+                // Assign an available field key
+                var existingKeys = Array.from(container.querySelectorAll('[data-field="field_key"]')).map(function(el) { return el.value; });
+                var allowedKeys = {!! json_encode(array_keys($allowedKeys)) !!};
+                var newKey = allowedKeys.find(function(k) { return existingKeys.indexOf(k) === -1; });
+                row.querySelector('[data-field="field_key"]').value = newKey || '';
+                row.querySelector('.field-key-tag').textContent = newKey || '';
+                row.querySelector('.field-key-tag').style.display = 'inline-block';
+                
                 container.appendChild(row);
                 bindRowEvents(row);
                 updateEmptyMsg();

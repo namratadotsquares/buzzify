@@ -56,7 +56,13 @@ class Blog extends Model
         'source_name',
         'latitude',
         'swipe_text',
-        'blog_code'
+        'blog_code',
+        'visibility_opt_1',
+        'visibility_opt_2',
+        'visibility_opt_3',
+        'visibility_opt_4',
+        'visibility_opt_5',
+        'visibility_opt_6'
 
     ];
 
@@ -260,14 +266,19 @@ class Blog extends Model
             }
 
             if (isset($search['visibility']) && $search['visibility'] != '') {
-                if ($search['visibility'] == 'featured') {
-                    $contact = $contact->where('is_featured', 1);
-                } else if ($search['visibility'] == 'slider') {
-                    $contact = $contact->where('is_slider', 1);
-                } else if ($search['visibility'] == 'editor_picks') {
-                    $contact = $contact->where('is_editor_picks', 1);
-                } else if ($search['visibility'] == 'weekly_top_picks') {
-                    $contact = $contact->where('is_weekly_top_picks', 1);
+                $allowed = array_keys(\App\Models\BlogVisibilityOption::$allowedFieldKeys);
+                if (in_array($search['visibility'], $allowed)) {
+                    $contact = $contact->where($search['visibility'], 1);
+                } else {
+                    if ($search['visibility'] == 'featured') {
+                        $contact = $contact->where('is_featured', 1);
+                    } else if ($search['visibility'] == 'slider') {
+                        $contact = $contact->where('is_slider', 1);
+                    } else if ($search['visibility'] == 'editor_picks') {
+                        $contact = $contact->where('is_editor_picks', 1);
+                    } else if ($search['visibility'] == 'weekly_top_picks') {
+                        $contact = $contact->where('is_weekly_top_picks', 1);
+                    }
                 }
             }
 

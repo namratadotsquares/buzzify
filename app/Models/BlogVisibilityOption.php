@@ -25,6 +25,12 @@ class BlogVisibilityOption extends Model
         'is_slider'          => 'Add to slider',
         'is_editor_picks'    => 'Editing',
         'is_weekly_top_picks'=> 'Final',
+        'visibility_opt_1'   => 'Option 1',
+        'visibility_opt_2'   => 'Option 2',
+        'visibility_opt_3'   => 'Option 3',
+        'visibility_opt_4'   => 'Option 4',
+        'visibility_opt_5'   => 'Option 5',
+        'visibility_opt_6'   => 'Option 6',
     ];
 
     /**

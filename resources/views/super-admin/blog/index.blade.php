@@ -231,10 +231,12 @@
                         <select data-placeholder="Select Visibility" name="visibility"
                             class="input box pr-10 placeholder-theme-13">
                             <option value="">Select Visibility</option>
-                            <option value="featured" @if (isset($_GET['visibility']) && $_GET['visibility'] == 'featured') selected @endif>Featured</option>
-                            <option value="slider" @if (isset($_GET['visibility']) && $_GET['visibility'] == 'slider') selected @endif>Slider</option>
-                            <option value="editor_picks" @if (isset($_GET['visibility']) && $_GET['visibility'] == 'editor_picks') selected @endif>Editing</option>
-                            <option value="weekly_top_picks" @if (isset($_GET['visibility']) && $_GET['visibility'] == 'weekly_top_picks') selected @endif>Final</option>
+                            @php
+                                $visOptions = \App\Models\BlogVisibilityOption::getActive();
+                            @endphp
+                            @foreach($visOptions as $opt)
+                                <option value="{{ $opt->field_key }}" @if(isset($_GET['visibility']) && $_GET['visibility'] == $opt->field_key) selected @endif>{{ $opt->label }}</option>
+                            @endforeach
                         </select>
                         <input type="text" class="input box pr-10 placeholder-theme-13"
                             @if (isset($_GET['name'])) value="{{ $_GET['name'] }}" @endif name="name"
