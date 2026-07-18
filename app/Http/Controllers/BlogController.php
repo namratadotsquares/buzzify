@@ -3043,6 +3043,12 @@ class BlogController extends Controller
                 $postData['is_slider'] = (isset($post['is_slider']) && $post['is_slider'] == 'on') ? 1 : 0;
                 $postData['is_editor_picks'] = (isset($post['is_editor_picks']) && $post['is_editor_picks'] == 'on') ? 1 : 0;
                 $postData['is_weekly_top_picks'] = (isset($post['is_weekly_top_picks']) && $post['is_weekly_top_picks'] == 'on') ? 1 : 0;
+                $postData['visibility_opt_1'] = (isset($post['visibility_opt_1']) && $post['visibility_opt_1'] == 'on') ? 1 : 0;
+                $postData['visibility_opt_2'] = (isset($post['visibility_opt_2']) && $post['visibility_opt_2'] == 'on') ? 1 : 0;
+                $postData['visibility_opt_3'] = (isset($post['visibility_opt_3']) && $post['visibility_opt_3'] == 'on') ? 1 : 0;
+                $postData['visibility_opt_4'] = (isset($post['visibility_opt_4']) && $post['visibility_opt_4'] == 'on') ? 1 : 0;
+                $postData['visibility_opt_5'] = (isset($post['visibility_opt_5']) && $post['visibility_opt_5'] == 'on') ? 1 : 0;
+                $postData['visibility_opt_6'] = (isset($post['visibility_opt_6']) && $post['visibility_opt_6'] == 'on') ? 1 : 0;
                 $postData['is_voting_enable'] = (isset($post['is_voting_enable']) && $post['is_voting_enable'] == 'on') ? 1 : 0;
 
                 $postData['created_by'] = Auth::User()->id;
