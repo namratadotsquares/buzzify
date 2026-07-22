@@ -1055,4 +1055,50 @@ check an create slug
         return $options;
     }
 
+    public static function resolveOpenAiModel(?string $model): string
+    {
+        $model = trim((string)$model);
+        if ($model === '') {
+            return 'gpt-5-mini';
+        }
+        $normalized = strtolower($model);
+        $aliases = [
+            'gpt4o mini' => 'gpt-4o-mini',
+            'gpt4o-mini' => 'gpt-4o-mini',
+            'gpt-4o mini' => 'gpt-4o-mini',
+            '4o-mini' => 'gpt-4o-mini',
+            'chatgpt5 mini' => 'gpt-5-mini',
+            'chatgpt-5-mini' => 'gpt-5-mini',
+            'chatgpt5-mini' => 'gpt-5-mini',
+            'gpt5 mini' => 'gpt-5-mini',
+            'gpt5-mini' => 'gpt-5-mini',
+            'gpt-5 mini' => 'gpt-5-mini',
+            'gpt-5-mini' => 'gpt-5-mini',
+            'gpt5' => 'gpt-5-mini',
+            'gpt-5' => 'gpt-5-mini',
+            'o3-mini' => 'o3-mini',
+            'openai 5' => 'gpt-5-mini',
+            'openai-5' => 'gpt-5-mini',
+            'open-ai-5' => 'gpt-5-mini',
+            'openai5' => 'gpt-5-mini',
+            'open-ai 5' => 'gpt-5-mini',
+            'openai 5 mini' => 'gpt-5-mini',
+            'openai-5-mini' => 'gpt-5-mini',
+            'open-ai-5-mini' => 'gpt-5-mini',
+            'open-ai 5-mini' => 'gpt-5-mini',
+            'openai5-mini' => 'gpt-5-mini',
+            'openai5mini' => 'gpt-5-mini',
+            'gpt mini 5' => 'gpt-5-mini',
+            'gpt-mini-5' => 'gpt-5-mini',
+        ];
+        return $aliases[$normalized] ?? $model;
+    }
+
+    public static function isOpenAiReasoningModel(?string $model): bool
+    {
+        $resolved = self::resolveOpenAiModel($model);
+        return (bool) preg_match('/^o\d/i', $resolved);
+    }
+
 }
+

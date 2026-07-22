@@ -162,7 +162,7 @@
                     <div class="mt-3 float-right">
                        <button type="button" id="rewrite_des_button" onclick="showdisrewrite();" class="button w-35 bg-theme-1 text-white">+ Rewrite Description</button>
                     </div>
-                    <div class="mt-3 p-5">
+                    <div class="mt-3 p-5" style="clear: both;">
                         <div class="accordion">
                             <div class="accordion-content mt-3" id="accordionDes">
                                 <div class="grid grid-cols-12 gap-4 row-gap-3">
@@ -238,6 +238,14 @@
                             </div>
                         </div>
                     </div>
+                    @if(!empty($blog->original_description))
+                    <div class="mt-3" style="clear: both; padding-top: 15px;">
+                        <label class="form-label" style="font-weight: 600; color: #4a5568;">Original Description (Word Count: {{ count(preg_split('/\s+/u', trim(strip_tags($blog->original_description)), -1, PREG_SPLIT_NO_EMPTY)) }})</label>
+                        <div class="mt-2">
+                            <textarea class="input w-full border mt-2 bg-gray-100 dark:bg-dark-1" readonly disabled rows="12" style="resize: none; cursor: not-allowed; color: #718096; background-color: #f7fafc;">{{ strip_tags($blog->original_description) }}</textarea>
+                        </div>
+                    </div>
+                    @endif
                     <div class="mt-3">
                         <label>{{__('admin.location')}}</label>
                         <input type="text" class="input w-full border mt-2" name="location" id="location" data-role="locationinput" value="" placeholder="{{__('admin.location_placeholder')}}" >
@@ -299,18 +307,37 @@
     <script>
         function initAutocomplete() {
             const input = document.getElementById("location");
+            if (!input || !window.google || !google.maps || !google.maps.places) return;
             const autocomplete = new google.maps.places.Autocomplete(input);
-    
-            autocomplete.addListener("place_changed", function () {
-                const place = autocomplete.getPlace();
-    
-                if (!place.geometry) {
-                    alert("No details available for input: '" + place.name + "'");
+
+            function setCoords(p) {
+                if (!p || !p.geometry || !p.geometry.location) {
+                    alert("No details available for input: '" + (input.value || (p ? p.name : '')) + "'");
                     return;
                 }
-    
-                document.getElementById("latitude").value = place.geometry.location.lat();
-                document.getElementById("longitude").value = place.geometry.location.lng();
+                let lat = typeof p.geometry.location.lat === 'function' ? p.geometry.location.lat() : p.geometry.location.lat;
+                let lng = typeof p.geometry.location.lng === 'function' ? p.geometry.location.lng() : p.geometry.location.lng;
+                document.getElementById("latitude").value = lat;
+                document.getElementById("longitude").value = lng;
+            }
+
+            autocomplete.addListener("place_changed", function () {
+                const place = autocomplete.getPlace();
+                if (place && place.geometry && place.geometry.location) {
+                    setCoords(place);
+                } else {
+                    let query = (place && place.name) ? place.name : input.value;
+                    if (query && query.trim() !== '') {
+                        const geocoder = new google.maps.Geocoder();
+                        geocoder.geocode({ address: query }, function(results, status) {
+                            if (status === "OK" && results && results.length > 0) {
+                                setCoords(results[0]);
+                            } else {
+                                alert("No details available for input: '" + query + "'");
+                            }
+                        });
+                    }
+                }
             });
         }
     

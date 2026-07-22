@@ -309,6 +309,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/addUpdateblogDraft', 'BlogController@addUpdateblogTest');
 
     Route::post('/addUpdateblog', 'BlogController@addUpdateblog');
+    Route::post('/translate-content', 'BlogController@translateContent');
 
     Route::post('/validateSlug', 'BlogController@validateSlug');
 

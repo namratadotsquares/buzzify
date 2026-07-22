@@ -493,24 +493,25 @@
                                             <input type="text" class="input w-full border mt-2" name="news_max_words" value="{{$row->value}}" placeholder="{{__('admin.news_max_words')}}">
                                         </div>
                                     @endif
+
+                                    @elseif($page == 'news_deletion')
+                                        
                                     @if($row->key == 'feature_category_auto_remove')
                                         <div class="mt-3">
-                                            <label>{{__('admin.feature_category_auto_remove')}}</label>
-                                            <input type="text" class="input w-full border mt-2" name="feature_category_auto_remove" value="{{$row->value}}" placeholder="{{__('admin.feature_category_auto_remove')}}">
+                                            <label>Featured News Banner Un-Feature Timing (Days)</label>
+                                            <input type="number" class="input w-full border mt-2" name="feature_category_auto_remove" value="{{$row->value}}" placeholder="e.g. 1">
                                         </div>
                                     @endif
                                     @if($row->key == 'personal_category_auto_remove')
                                         <div class="mt-3">
-                                            <label>{{__('admin.personal_category_auto_remove')}}</label>
-                                            <input type="text" class="input w-full border mt-2" name="personal_category_auto_remove" value="{{$row->value}}" placeholder="{{__('admin.personal_category_auto_remove')}}">
+                                            <label>YourBuzz (Personal) News Deletion Timing (Days)</label>
+                                            <input type="number" class="input w-full border mt-2" name="personal_category_auto_remove" value="{{$row->value}}" placeholder="e.g. 7">
                                         </div>
                                     @endif
-                                    @elseif($page == 'news_deletion')
-                                        
                                     @if($row->key == 'news_deletion')
                                         <div class="mt-3">
-                                            <label>News Deletion Days</label>
-                                            <input type="text" class="input w-full border mt-2" name="news_deletion" value="{{$row->value}}" placeholder="{{__('admin.news_deletion')}}">
+                                            <label>Other News Deletion Timing (Hours)</label>
+                                            <input type="number" class="input w-full border mt-2" name="news_deletion" value="{{$row->value}}" placeholder="e.g. 48">
                                         </div>
                                     @endif
                                     <!-- @if($row->key == 'wallet_expiry')-->

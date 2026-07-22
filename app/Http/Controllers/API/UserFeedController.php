@@ -278,6 +278,8 @@ class UserFeedController extends Controller
                 }
             ])
             ->orderBy('schedule_date', 'DESC')
+            ->orderBy('updated_at', 'DESC')
+            ->orderBy('id', 'DESC')
             ->get();
 
         foreach ($blogs as $row) {
@@ -415,23 +417,34 @@ class UserFeedController extends Controller
             $lat = $search['lat'];   // e.g., 28.6139
             $lng = $search['long'];  // e.g., 77.2090
             $radius =  $location_radius->value ?? 50; // in kilometers
+            $latF = (float) $lat;
+            $lngF = (float) $lng;
+            $distExprs = [];
+            for ($i = 0; $i < 50; $i++) {
+                $latExt = "IF(latitude LIKE '[%', CAST(JSON_UNQUOTE(JSON_EXTRACT(latitude, '$[$i]')) AS DECIMAL(10,8)), " . ($i == 0 ? "latitude" : "NULL") . ")";
+                $lngExt = "IF(longitude LIKE '[%', CAST(JSON_UNQUOTE(JSON_EXTRACT(longitude, '$[$i]')) AS DECIMAL(11,8)), " . ($i == 0 ? "longitude" : "NULL") . ")";
+                $distExprs[] = "IFNULL(6371 * acos(GREATEST(-1, LEAST(1, cos(radians($latF)) * cos(radians($latExt)) * cos(radians($lngExt) - radians($lngF)) + sin(radians($latF)) * sin(radians($latExt))))), 999999)";
+            }
+            $minDistanceExpr = "LEAST(" . implode(', ', $distExprs) . ")";
+            
             $blog = Blog::select('blog.*')
-                ->where('status', 1)
-                ->where('schedule_date', '<=', now())
-                ->whereNotIn('id', $viewedBlogIds)
+                ->where(function($q) use ($viewedBlogIds) {
+                    $q->where('status', 1)
+                      ->where('schedule_date', '<=', now());
+                    if (!empty($viewedBlogIds)) {
+                        $q->whereNotIn('id', $viewedBlogIds);
+                    }
+                })
                 ->with('blog_category')
-                ->selectRaw("
-                    6371 * acos(
-                        cos(radians(?)) * cos(radians(latitude)) *
-                        cos(radians(longitude) - radians(?)) +
-                        sin(radians(?)) * sin(radians(latitude))
-                    ) AS distance", [$lat, $lng, $lat])
-                ->havingRaw("distance <= ?", [$radius])
-                ->orderBy("distance", "ASC")
+                ->selectRaw("$minDistanceExpr AS distance")
+                ->whereRaw("($minDistanceExpr) <= ?", [$radius])
                 ->orderBy("schedule_date", "DESC")
+                ->orderBy("updated_at", "DESC")
                 ->orderBy("id", "DESC")
                 ->paginate($pagination_no)
                 ->appends(['per_page' => $pagination_no]);
+        } else {
+            $blog = new \Illuminate\Pagination\LengthAwarePaginator([], 0, $pagination_no);
         }
 
         foreach ($blog as $row) {
@@ -620,21 +633,30 @@ class UserFeedController extends Controller
                 $lat = $search['lat'];   // e.g., 28.6139
                 $lng = $search['long'];  // e.g., 77.2090
                 $radius = $location_radius->value ?? 50; // in kilometers
+                $latF = (float) $lat;
+                $lngF = (float) $lng;
+                $distExprs = [];
+                for ($i = 0; $i < 50; $i++) {
+                    $latExt = "IF(latitude LIKE '[%', CAST(JSON_UNQUOTE(JSON_EXTRACT(latitude, '$[$i]')) AS DECIMAL(10,8)), " . ($i == 0 ? "latitude" : "NULL") . ")";
+                    $lngExt = "IF(longitude LIKE '[%', CAST(JSON_UNQUOTE(JSON_EXTRACT(longitude, '$[$i]')) AS DECIMAL(11,8)), " . ($i == 0 ? "longitude" : "NULL") . ")";
+                    $distExprs[] = "IFNULL(6371 * acos(GREATEST(-1, LEAST(1, cos(radians($latF)) * cos(radians($latExt)) * cos(radians($lngExt) - radians($lngF)) + sin(radians($latF)) * sin(radians($latExt))))), 999999)";
+                }
+                $minDistanceExpr = "LEAST(" . implode(', ', $distExprs) . ")";
+
                 $blog = Blog::select('blog.*')
-                    ->where('status', 1)
-                    ->where('schedule_date', '<=', now())
-                    ->whereNotIn('id', $viewedBlogIds)
-                    ->orWhereIn('id', [$feature_news_id])
+                    ->where(function($q) use ($viewedBlogIds, $feature_news_id) {
+                        $q->where('status', 1)
+                          ->where('schedule_date', '<=', now());
+                        if (!empty($viewedBlogIds)) {
+                            $q->whereNotIn('id', $viewedBlogIds);
+                        }
+                        $q->orWhereIn('id', [$feature_news_id]);
+                    })
                     ->with('blog_category')
-                    ->selectRaw("
-                        6371 * acos(
-                            cos(radians(?)) * cos(radians(latitude)) *
-                            cos(radians(longitude) - radians(?)) +
-                            sin(radians(?)) * sin(radians(latitude))
-                        ) AS distance", [$lat, $lng, $lat])
-                    ->havingRaw("distance <= ?", [$radius])
-                    ->orderBy("distance", "ASC")
+                    ->selectRaw("$minDistanceExpr AS distance")
+                    ->whereRaw("($minDistanceExpr) <= ?", [$radius])
                     ->orderBy("schedule_date", "DESC")
+                    ->orderBy("updated_at", "DESC")
                     ->orderBy("id", "DESC")
                     ->paginate($pagination_no)
                     ->appends(['per_page' => $pagination_no]);
@@ -677,6 +699,7 @@ class UserFeedController extends Controller
                 }
 
                 $blog = $blogQuery->orderBy('schedule_date', 'DESC')
+                    ->orderBy('updated_at', 'DESC')
                     ->orderBy('id', 'DESC')
                     ->paginate($pagination_no)
                     ->appends('per_page', $pagination_no);
@@ -709,6 +732,7 @@ class UserFeedController extends Controller
                 }
 
                 $blog = $blogQuery->orderBy('schedule_date', 'DESC')
+                    ->orderBy('updated_at', 'DESC')
                     ->orderBy('id', 'DESC')
                     ->paginate($pagination_no)
                     ->appends('per_page', $pagination_no);
@@ -727,6 +751,7 @@ class UserFeedController extends Controller
                 }
 
                 $blog = $blogQuery->orderBy('schedule_date', 'DESC')
+                    ->orderBy('updated_at', 'DESC')
                     ->orderBy('id', 'DESC')
                     ->paginate($pagination_no)->appends('per_page', $pagination_no);
             }
@@ -886,9 +911,13 @@ class UserFeedController extends Controller
 
         $blog = Blog::where('status', 1)
             ->where('schedule_date', "<=", date("Y-m-d H:i:s"))
-            ->whereNotIn('id', $viewedBlogIds)
+            ->when(!empty($viewedBlogIds), function($q) use ($viewedBlogIds) {
+                $q->whereNotIn('id', $viewedBlogIds);
+            })
             ->with('blog_category')
             ->orderBy('schedule_date', 'DESC')
+            ->orderBy('updated_at', 'DESC')
+            ->orderBy('id', 'DESC')
             ->paginate($pagination_no)->appends('per_page', $pagination_no);
 
         //whereIn('category_id',$blogCategory)->     

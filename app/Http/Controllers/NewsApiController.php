@@ -399,6 +399,25 @@ class NewsApiController extends Controller
 				$params['dataType'] = $request->input('dataType');
 			}
 
+			// Dual-range sentiment slider: sentimentMin / sentimentMax (range: -1.0 to 1.0)
+			$sentimentMin = $request->input('sentimentMin');
+			$sentimentMax = $request->input('sentimentMax');
+			if ($sentimentMin !== null && $sentimentMin !== '' && $sentimentMax !== null && $sentimentMax !== '') {
+				$sentimentMinVal = max(-1.0, min(1.0, (float)$sentimentMin));
+				$sentimentMaxVal = max(-1.0, min(1.0, (float)$sentimentMax));
+				// Only apply filter if not the full default range (-1 to 1)
+				if ($sentimentMinVal > -1.0 || $sentimentMaxVal < 1.0) {
+					$params['sentimentMin'] = $sentimentMinVal;
+					$params['minSentiment'] = $sentimentMinVal;
+					$params['sentimentMax'] = $sentimentMaxVal;
+					$params['maxSentiment'] = $sentimentMaxVal;
+				}
+			}
+
+			if ($request->has('minSocialScore') && $request->input('minSocialScore') !== '') {
+				$params['minSocialScore'] = (int)$request->input('minSocialScore');
+			}
+
 			$result = $this->fetchEventRegistryNews($params, true);
 
 			if (isset($result['articles']['results'])) {
@@ -415,7 +434,6 @@ class NewsApiController extends Controller
 				$totalResults = $result['articles']['totalResults'] ?? 0;
 				$currentPage = $result['articles']['page'] ?? 1;
 
-				// Map Event Registry structure to the format expected by the view
 				$mappedData = array_map(function ($article) {
 					return [
 					'source' => [
@@ -427,6 +445,7 @@ class NewsApiController extends Controller
 					'description' => html_entity_decode($article['body'] ?? '', ENT_QUOTES | ENT_HTML5, 'UTF-8'),
 					'url' => $article['url'] ?? '',
 					'urlToImage' => $article['image'] ?? null,
+					'videos' => $article['videos'] ?? [],
 					'publishedAt' => $article['dateTimePub'] ?? ($article['date'] ?? ''),
 					'content' => html_entity_decode($article['body'] ?? '', ENT_QUOTES | ENT_HTML5, 'UTF-8')
 					];
@@ -540,23 +559,32 @@ class NewsApiController extends Controller
 					$cleanContent = substr($cleanContent, 0, $lastPeriod + 1);
 				}
 			}
-			$datagpt = $this->translateAndCategorizeNewsArticle($post['title'], $cleanContent ?? '', $categorys);
+			$datagpt = $this->translateAndCategorizeNewsArticle($post['title'], $post['description'] ?? '', $categorys);
 			$category = $this->resolveNewsCategory($datagpt['category'] ?? '');
+			
+			$max_words = SiteContent::where('key', 'news_max_words')->first()->value ?? 60;
+			$englishDesc = $this->clipHtmlToMaxWords($datagpt['english_description'] ?? $post['description'] ?? '', $max_words);
+			$hindiDesc = $this->clipHtmlToMaxWords($datagpt['hindi_description'] ?? $cleanContent, $max_words, true);
+
 			// Insert blog
 			$inject = [
 				'slug' => $slug,
 				'title' => $datagpt['english_title'] ?? $post['title'],
-				'short_description' => $datagpt['english_description'] ?? $post['description'],
+				'short_description' => $englishDesc,
 				'url' => $post['url'],
 				'source_name' => $post['source'],
 				'source_published_at' => isset($post['publishedAt']) && $post['publishedAt'] != '' ?Carbon::parse($post['publishedAt'])->toDateTimeString() : null,
-				'description' => $datagpt['english_description'] ?? $post['description'],
+				'description' => $englishDesc,
+				'original_description' => $post['description'] ?? null,
+				'video_url' => $post['video_url'] ?? null,
 				'created_by' => Auth::user()->id,
 				'category_id' => $category ? $category->id : null,
-				'content_type' => 'text',
+				'content_type' => !empty($post['video_url']) ? 'video' : 'text',
 				'schedule_date' => now(),
 				'status' => 2,
 				'blog_accent_code' => setting('blog_accent_code'),
+				'latitude' => $datagpt['latitude'] ?? null,
+				'longitude' => $datagpt['longitude'] ?? null,
 				'created_at' => now(),
 			];
 
@@ -583,7 +611,7 @@ class NewsApiController extends Controller
 			['blog_id' => $blog_id, 'language_code' => 'en'],
 			[
 				'title' => $datagpt['english_title'] ?? $post['title'],
-				'description' => $datagpt['english_description'] ?? $post['description'],
+				'description' => $englishDesc,
 				'created_at' => now(),
 			]
 			);
@@ -592,7 +620,7 @@ class NewsApiController extends Controller
 			['blog_id' => $blog_id, 'language_code' => 'hi'],
 			[
 				'title' => $datagpt['hindi_title'] ?? $post['title'],
-				'description' => $datagpt['hindi_description'] ?? $cleanContent,
+				'description' => $hindiDesc,
 				'created_at' => now(),
 			]
 			);
@@ -701,7 +729,7 @@ class NewsApiController extends Controller
 					}
 				}
 
-				$datagpt = $this->translateAndCategorizeNewsArticle($post['title'], $cleanContent, $categorys);
+				$datagpt = $this->translateAndCategorizeNewsArticle($post['title'], $post['description'] ?? '', $categorys);
 
 				$slug = \Helpers::createSlug($post['title'], 'blog', 0, false);
 				$category = $this->resolveNewsCategory($datagpt['category'] ?? '');
@@ -713,20 +741,28 @@ class NewsApiController extends Controller
 					continue;
 				}
 
+				$max_words = SiteContent::where('key', 'news_max_words')->first()->value ?? 60;
+				$englishDesc = $this->clipHtmlToMaxWords($datagpt['english_description'] ?? $post['description'] ?? '', $max_words);
+				$hindiDesc = $this->clipHtmlToMaxWords($datagpt['hindi_description'] ?? $post['content'] ?? '', $max_words, true);
+
 				$blog = Blog::create([
 					'slug' => $slug,
 					'title' => $datagpt['english_title'] ?? $post['title'],
-					'short_description' => $datagpt['english_description'] ?? $post['description'] ?? '',
+					'short_description' => $englishDesc,
 					'url' => $post['url'] ?? '',
 					'source_name' => is_array($post['source']) ? ($post['source']['name'] ?? '') : ($post['source'] ?? ''),
-					'description' => $datagpt['english_description'] ?? $post['content'] ?? '',
+					'description' => $englishDesc,
+					'original_description' => $post['description'] ?? $post['content'] ?? null,
+					'video_url' => $post['video_url'] ?? null,
 					'created_by' => $userId,
 					'category_id' => $category->id ?? null,
-					'content_type' => 'text',
+					'content_type' => !empty($post['video_url']) ? 'video' : 'text',
 					'schedule_date' => $now,
 					'status' => 2,
 					'blog_accent_code' => setting('blog_accent_code'),
 					'source_published_at' => isset($post['publishedAt']) && $post['publishedAt'] != '' ?Carbon::parse($post['publishedAt'])->toDateTimeString() : null,
+					'latitude' => $datagpt['latitude'] ?? null,
+					'longitude' => $datagpt['longitude'] ?? null,
 					'created_at' => $now,
 				]);
 
@@ -746,12 +782,12 @@ class NewsApiController extends Controller
 
 				BlogTranslation::updateOrInsert(
 				['blog_id' => $blog->id, 'language_code' => 'en'],
-				['title' => $datagpt['english_title'] ?? $post['title'], 'description' => $datagpt['english_description'] ?? $post['description'] ?? '', 'created_at' => $now]
+				['title' => $datagpt['english_title'] ?? $post['title'], 'description' => $englishDesc, 'created_at' => $now]
 				);
 
 				BlogTranslation::updateOrInsert(
 				['blog_id' => $blog->id, 'language_code' => 'hi'],
-				['title' => $datagpt['hindi_title'] ?? $post['title'], 'description' => $datagpt['hindi_description'] ?? $post['content'] ?? '', 'created_at' => $now]
+				['title' => $datagpt['hindi_title'] ?? $post['title'], 'description' => $hindiDesc, 'created_at' => $now]
 				);
 
 				// Image handling (same as cron and single save)
@@ -839,20 +875,32 @@ class NewsApiController extends Controller
 				$cleanContent = preg_replace('/\s?\[\+\d+\schars\]$/', '', $article['description'] ?? '');
 
 				// Process with AI for categorization and Hindi translation
-				$datagpt = $this->translateAndCategorizeNewsArticle($article['title'], $cleanContent ?? '', $categorys);
+				$datagpt = $this->translateAndCategorizeNewsArticle($article['title'], $article['description'] ?? '', $categorys);
 				$category = $this->resolveNewsCategory($datagpt['category'] ?? '');
+
+				$max_words = SiteContent::where('key', 'news_max_words')->first()->value ?? 60;
+				$englishDesc = $this->clipHtmlToMaxWords($datagpt['english_description'] ?? $article['content'] ?? '', $max_words);
+				$hindiDesc = $this->clipHtmlToMaxWords($datagpt['hindi_description'] ?? $article['content'] ?? '', $max_words, true);
+
+				$videoUrl = null;
+				if (!empty($article['videos']) && is_array($article['videos'])) {
+					$firstVideo = reset($article['videos']);
+					$videoUrl = is_string($firstVideo) ? $firstVideo : ($firstVideo['url'] ?? null);
+				}
 
 				// Create Blog
 				$blog = Blog::create([
 					'slug' => $slug,
 					'title' => $datagpt['english_title'] ?? $article['title'],
-					'short_description' => $article['description'] ?? '',
+					'short_description' => $englishDesc,
 					'url' => $article['url'],
 					'source_name' => $article['source']['name'] ?? '',
-					'description' => $datagpt['english_description'] ?? $article['content'],
+					'description' => $englishDesc,
+					'original_description' => $article['description'] ?? $article['content'] ?? null,
+					'video_url' => $videoUrl,
 					'created_by' => $createdBy,
 					'category_id' => $category ? $category->id : null,
-					'content_type' => 'text',
+					'content_type' => !empty($videoUrl) ? 'video' : 'text',
 					'schedule_date' => $now,
 					'status' => 2,
 					'blog_accent_code' => setting('blog_accent_code'),
@@ -867,11 +915,11 @@ class NewsApiController extends Controller
 				// Translations
 				BlogTranslation::updateOrInsert(
 				['blog_id' => $blog->id, 'language_code' => 'en'],
-				['title' => $datagpt['english_title'] ?? $article['title'], 'description' => $datagpt['english_description'] ?? $article['description'], 'created_at' => $now]
+				['title' => $datagpt['english_title'] ?? $article['title'], 'description' => $englishDesc, 'created_at' => $now]
 				);
 				BlogTranslation::updateOrInsert(
 				['blog_id' => $blog->id, 'language_code' => 'hi'],
-				['title' => $datagpt['hindi_title'] ?? $article['title'], 'description' => $datagpt['hindi_description'] ?? $article['content'], 'created_at' => $now]
+				['title' => $datagpt['hindi_title'] ?? $article['title'], 'description' => $hindiDesc, 'created_at' => $now]
 				);
 
 				// Image handling
@@ -959,13 +1007,16 @@ class NewsApiController extends Controller
 	 */
 
 	/**
-	 * Direct translation and categorization (No Rewrite)
-	 * Uses original content for English and provides Hindi translation.
+	 * Direct translation and categorization (With AI Rewrite for English description)
+	 * Uses AI to rewrite the English description based on the word limit, and translates it to Hindi.
 	 */
 	public function translateAndCategorizeNewsArticle($title, $description, $categorys)
 	{
+		$max_words = SiteContent::where('key', 'news_max_words')->first()->value ?? 60;
+		$min_words = max(1, $max_words - 10);
+
 		$prompt = <<<EOT
-You are an expert news classifier and translator.
+You are an expert news editor, classifier, and translator.
 
 Follow these instructions perfectly and return a JSON object ONLY.
 
@@ -979,17 +1030,32 @@ You MUST choose **exactly one** category from that list that best describes the 
 Your chosen category MUST match the text of a category from the list exactly. Do not invent categories. 
 If and only if absolutely no listed category is suitable, return your category as exactly "Others".
 
-### Step 2: Translation  
-- Translate the original **English Title** into **Hindi**.  
-- Translate the original **English Description** into **Hindi**.  
+### Step 2: English Rewrite
+- Rewrite the news description into a professional, clear, and engaging English description (summary).
+- The rewritten English description MUST be between $min_words and $max_words words, and MUST NOT exceed $max_words words. Keep the meaning accurate and factual. Do not add any new claims.
+
+### Step 3: Translation  
+- If the original Title is not in Hindi, translate it into **Hindi**. If it is already in Hindi, just provide the Hindi Title as is.
+- Translate the AI-generated English description (from Step 2) into clear, fluent, and accurate **Hindi**, maintaining the professional tone and clarity.
+- Provide a natural, complete Hindi summary (around 2 to 4 complete sentences). Ensure all sentences are complete and do NOT cut off mid-sentence. (The Hindi word count can naturally be higher than English to ensure proper grammar, postpositions, and sentence structure).
+- DO NOT use em dashes (—), en dashes (–), or double hyphens (--). Use standard commas, colons, or periods for punctuation.
+
+### Step 4: Location Extraction
+- Identify ANY and ALL place names (city, state, country, or region) mentioned anywhere in the Title and Description. This applies regardless of whether the text is in English, Hindi, or both.
+- If locations are found, provide an array of objects, each containing the place `name`, its approximate geographic `latitude` and `longitude` as numeric values. (Use your general knowledge to estimate the coordinates).
+- If no location is mentioned, return an empty array for `locations`: `[]`.
 
 ---
 
 Output a valid JSON object matching this structure EXACTLY:
 {
   "category": "Exact matched category name from the available categories list",
+  "english_description": "AI-generated English description within word limit",
   "hindi_title": "Hindi translation of the title",
-  "hindi_description": "Hindi translation of the description"
+  "hindi_description": "Hindi translation of the AI-generated English description",
+  "locations": [
+    {"name": "Delhi", "latitude": 28.6139, "longitude": 77.2090}
+  ]
 }
 
 ---
@@ -999,26 +1065,36 @@ News Title: $title
 News Description: $description
 EOT;
 
-		$response = Http::withToken(env('chatgpt_key'))
-			->timeout(60)
-			->post('https://api.openai.com/v1/chat/completions', [
-			'model' => env('OPENAI_MODEL', 'gpt-5-mini'),
-			'response_format' => ['type' => 'json_object'],
+		$modelName = \Helpers::resolveOpenAiModel(env('OPENAI_MODEL', 'gpt-5-mini'));
+		$isReasoning = \Helpers::isOpenAiReasoningModel($modelName);
+		$systemRole = $isReasoning ? 'developer' : 'system';
+
+		$payload = [
+			'model' => $modelName,
 			'messages' => [
-				['role' => 'system', 'content' => 'You are an AI that strictly returns valid JSON.'],
+				['role' => $systemRole, 'content' => 'You are an AI that strictly returns valid JSON.'],
 				['role' => 'user', 'content' => $prompt]
 			]
-		]);
+		];
 
-		if ($response->failed()) {
-			return [
-				'category' => 'Others',
-				'english_title' => $title,
-				'english_description' => $description,
-				'hindi_title' => $title,
-				'hindi_description' => $description,
-			];
+		if (!$isReasoning) {
+			$payload['response_format'] = ['type' => 'json_object'];
 		}
+
+		$response = Http::withToken(env('chatgpt_key'))
+			->timeout(60)
+			->post('https://api.openai.com/v1/chat/completions', $payload);
+
+        if ($response->failed()) {
+            \Log::error('OpenAI API Request Failed: ' . $response->body());
+            return [
+                'category' => 'Others',
+                'english_title' => $title,
+                'english_description' => $description,
+                'hindi_title' => $title,
+                'hindi_description' => $description,
+            ];
+        }
 
 		$output = $response->json()['choices'][0]['message']['content'];
 		$output = trim($output);
@@ -1035,25 +1111,68 @@ EOT;
 			$output = trim($output);
 		}
 
-		$data = json_decode($output, true);
+        $data = json_decode($output, true);
+        \Log::info('OpenAI Raw Response: ' . $output);
 
-		if (json_last_error() === JSON_ERROR_NONE && is_array($data)) {
+        if (json_last_error() === JSON_ERROR_NONE && is_array($data)) {
+            $lats = [];
+            $lngs = [];
+            if (!empty($data['locations']) && is_array($data['locations'])) {
+                foreach ($data['locations'] as $loc) {
+                    $lat = $loc['latitude'] ?? $loc['lat'] ?? null;
+                    $lng = $loc['longitude'] ?? $loc['lng'] ?? $loc['long'] ?? null;
+                    if ($lat !== null && $lng !== null && is_numeric($lat) && is_numeric($lng)) {
+                        $lats[] = (string)$lat;
+                        $lngs[] = (string)$lng;
+                    }
+                }
+            }
+            \Log::info('Extracted Lats: ' . json_encode($lats) . ', Lngs: ' . json_encode($lngs));
+
 			return [
 				'category' => $data['category'] ?? 'Others',
-				'english_title' => $title,
-				'english_description' => $description,
-				'hindi_title' => $data['hindi_title'] ?? $title,
-				'hindi_description' => $data['hindi_description'] ?? $description,
+				'english_title' => $this->removeEmDashes($title),
+				'english_description' => $this->removeEmDashes($data['english_description'] ?? $description),
+				'hindi_title' => $this->removeEmDashes($data['hindi_title'] ?? $title),
+				'hindi_description' => $this->removeEmDashes($data['hindi_description'] ?? $description),
+                'latitude' => !empty($lats) ? json_encode($lats) : null,
+                'longitude' => !empty($lngs) ? json_encode($lngs) : null,
 			];
 		}
 
 		return [
 			'category' => 'Others',
-			'english_title' => $title,
-			'english_description' => $description,
-			'hindi_title' => $title,
-			'hindi_description' => $description,
+			'english_title' => $this->removeEmDashes($title),
+			'english_description' => $this->removeEmDashes($description),
+			'hindi_title' => $this->removeEmDashes($title),
+			'hindi_description' => $this->removeEmDashes($description),
+            'latitude' => null,
+            'longitude' => null,
 		];
+	}
+
+	private function clipHtmlToMaxWords($html, $maxWords, $isHindi = false)
+	{
+		$plainText = trim((string) strip_tags($html));
+		if ($plainText === '') {
+			return '';
+		}
+
+		// Detect if text is Hindi or explicitly specified as Hindi
+		$containsHindi = $isHindi || (bool)preg_match('/[\x{0900}-\x{097F}]/u', $plainText);
+
+		// If Hindi, allow higher word count tolerance so natural Hindi grammar isn't artificially choked
+		$effectiveMax = $containsHindi ? max((int)round($maxWords * 1.4), $maxWords + 25) : $maxWords;
+
+		$words = preg_split('/\s+/u', $plainText, -1, PREG_SPLIT_NO_EMPTY);
+		if (count($words) <= $effectiveMax) {
+			return '<p>' . $this->ensureCompleteSentences($plainText) . '</p>';
+		}
+
+		$clippedText = implode(' ', array_slice($words, 0, $effectiveMax));
+		$clippedText = $this->ensureCompleteSentences($clippedText);
+
+		return '<p>' . $clippedText . '</p>';
 	}
 
 	/**
@@ -1093,6 +1212,11 @@ EOT;
 				'timeEnd' => $params['timeEnd'] ?? $request->input('timeEnd'),
 				'sentimentMin' => $params['sentimentMin'] ?? $request->input('sentimentMin'),
 				'sentimentMax' => $params['sentimentMax'] ?? $request->input('sentimentMax'),
+				'minSentiment' => $params['minSentiment'] ?? $params['sentimentMin'] ?? $request->input('minSentiment') ?? $request->input('sentimentMin'),
+				'maxSentiment' => $params['maxSentiment'] ?? $params['sentimentMax'] ?? $request->input('maxSentiment') ?? $request->input('sentimentMax'),
+				'minSocialScore' => $params['minSocialScore'] ?? $request->input('minSocialScore'),
+				'includeArticleVideos' => true,
+				'includeArticleSentiment' => true,
 				'isDuplicate' => $params['isDuplicate'] ?? $request->input('isDuplicate', 'skipDuplicates'),
 				'resultType' => $params['resultType'] ?? $request->input('resultType', 'articles'),
 				'articlesCount' => min($params['articlesCount'] ?? $request->input('articlesCount', 100), 200),
@@ -1219,12 +1343,36 @@ EOT;
 	}
 
 	/**
+	 * Replaces em dashes (—), en dashes (–), and double hyphens (--) with standard punctuation or spaces.
+	 */
+	private function removeEmDashes(string $text): string
+	{
+		$text = trim($text);
+		if ($text === '') {
+			return $text;
+		}
+
+		// Replace em dashes (—), en dashes (–), or '--' surrounded by spaces with ", "
+		$text = preg_replace('/\s*[—–]\s*/u', ', ', $text);
+		$text = preg_replace('/\s*--\s*/', ', ', $text);
+
+		// Replace any remaining standalone em/en dashes
+		$text = str_replace(['—', '–'], '-', $text);
+
+		// Clean up consecutive commas or spaces
+		$text = preg_replace('/,\s*,+/', ',', $text);
+		$text = preg_replace('/\s\s+/', ' ', $text);
+
+		return trim($text);
+	}
+
+	/**
 	 * Ensures that the given text ends with a complete sentence.
 	 * Prunes trailing truncated sentences or adds a period if necessary.
 	 */
 	private function ensureCompleteSentences(string $text): string
 	{
-		$text = trim($text);
+		$text = $this->removeEmDashes($text);
 		if ($text === '')
 			return $text;
 

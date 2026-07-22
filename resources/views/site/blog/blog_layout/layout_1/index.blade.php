@@ -76,6 +76,21 @@
                                                 <?php echo $blog_detail['description']; ?>
                                             </p>
                                         </div>
+                                        @if(!empty($blog_detail['video_url']))
+                                        <div class="video-section" style="margin: 30px 0; padding: 20px; background-color: #f9f9f9; border-radius: 8px;">
+                                            <h3 style="margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 10px;">Related Video</h3>
+                                            @if(\Helpers::getYoutubeEmbedUrl($blog_detail['video_url']))
+                                                <iframe width="100%" height="450" src="{{\Helpers::getYoutubeEmbedUrl($blog_detail['video_url'])}}" frameborder="0" allowfullscreen></iframe>
+                                            @elseif(preg_match('/\.(mp4|webm|ogg)$/i', $blog_detail['video_url']))
+                                                <video width="100%" height="auto" controls>
+                                                    <source src="{{$blog_detail['video_url']}}" type="video/mp4">
+                                                    Your browser does not support the video tag.
+                                                </video>
+                                            @else
+                                                <a href="{{$blog_detail['video_url']}}" target="_blank" style="background-color: #007bff; color: white; padding: 10px 20px; border-radius: 5px; text-decoration: none; display: inline-block;">Watch Video</a>
+                                            @endif
+                                        </div>
+                                        @endif
                                         <div class="clearfix"></div>
                                         <div class="single_tag_share">
                                             <div class="tag-cat">

@@ -736,16 +736,16 @@ class CategoryAPIController extends Controller
                             CASE
                                 WHEN latitude IS NOT NULL AND longitude IS NOT NULL AND (
                                     6371 * acos(
-                                        cos(radians(?)) * cos(radians(latitude)) *
-                                        cos(radians(longitude) - radians(?)) +
-                                        sin(radians(?)) * sin(radians(latitude))
+                                        cos(radians(?)) * cos(radians(IF(latitude LIKE '[%', CAST(JSON_UNQUOTE(JSON_EXTRACT(latitude, '$[0]')) AS DECIMAL(10,8)), latitude))) *
+                                        cos(radians(IF(longitude LIKE '[%', CAST(JSON_UNQUOTE(JSON_EXTRACT(longitude, '$[0]')) AS DECIMAL(11,8)), longitude)) - radians(?)) +
+                                        sin(radians(?)) * sin(radians(IF(latitude LIKE '[%', CAST(JSON_UNQUOTE(JSON_EXTRACT(latitude, '$[0]')) AS DECIMAL(10,8)), latitude)))
                                     )
                                 ) <= ?
                                 THEN (
                                     6371 * acos(
-                                        cos(radians(?)) * cos(radians(latitude)) *
-                                        cos(radians(longitude) - radians(?)) +
-                                        sin(radians(?)) * sin(radians(latitude))
+                                        cos(radians(?)) * cos(radians(IF(latitude LIKE '[%', CAST(JSON_UNQUOTE(JSON_EXTRACT(latitude, '$[0]')) AS DECIMAL(10,8)), latitude))) *
+                                        cos(radians(IF(longitude LIKE '[%', CAST(JSON_UNQUOTE(JSON_EXTRACT(longitude, '$[0]')) AS DECIMAL(11,8)), longitude)) - radians(?)) +
+                                        sin(radians(?)) * sin(radians(IF(latitude LIKE '[%', CAST(JSON_UNQUOTE(JSON_EXTRACT(latitude, '$[0]')) AS DECIMAL(10,8)), latitude)))
                                     )
                                 )
                                 ELSE NULL
@@ -755,9 +755,9 @@ class CategoryAPIController extends Controller
                             CASE
                                 WHEN latitude IS NOT NULL AND longitude IS NOT NULL AND (
                                     6371 * acos(
-                                        cos(radians(?)) * cos(radians(latitude)) *
-                                        cos(radians(longitude) - radians(?)) +
-                                        sin(radians(?)) * sin(radians(latitude))
+                                        cos(radians(?)) * cos(radians(IF(latitude LIKE '[%', CAST(JSON_UNQUOTE(JSON_EXTRACT(latitude, '$[0]')) AS DECIMAL(10,8)), latitude))) *
+                                        cos(radians(IF(longitude LIKE '[%', CAST(JSON_UNQUOTE(JSON_EXTRACT(longitude, '$[0]')) AS DECIMAL(11,8)), longitude)) - radians(?)) +
+                                        sin(radians(?)) * sin(radians(IF(latitude LIKE '[%', CAST(JSON_UNQUOTE(JSON_EXTRACT(latitude, '$[0]')) AS DECIMAL(10,8)), latitude)))
                                     )
                                 ) <= ? THEN 0 ELSE 1
                             END ASC", [$lat, $lng, $lat, $radius]);
@@ -1174,6 +1174,9 @@ class CategoryAPIController extends Controller
                 $pagination_no = $search['per_page'];
             }
             $blog = Blog::where('category_id', '=', $id)->where('status', 1)
+                ->where('schedule_date', '<=', now())
+                ->orderBy('schedule_date', 'DESC')
+                ->orderBy('id', 'DESC')
                 ->get();
 
             return $this->sendResponse($blog, __('message_alerts.category_list'));

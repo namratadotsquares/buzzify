@@ -108,6 +108,96 @@
             border-color: #2d3748 !important;
             color: #cbd5e1 !important;
         }
+
+        /* ── Sentiment dual-range slider ── */
+        .sentiment-slider-wrap {
+            position: relative;
+            padding: 6px 0 28px;
+        }
+        .sentiment-track {
+            position: relative;
+            height: 6px;
+            border-radius: 99px;
+            background: #e2e8f0;
+            margin: 18px 0 8px;
+        }
+        .dark-mode .sentiment-track { background: #2d3748; }
+        .sentiment-fill {
+            position: absolute;
+            height: 100%;
+            border-radius: 99px;
+            background: linear-gradient(90deg, #ef4444 0%, #94a3b8 50%, #22c55e 100%);
+            pointer-events: none;
+        }
+        .sentiment-track input[type=range] {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 100%;
+            height: 6px;
+            background: transparent;
+            -webkit-appearance: none;
+            appearance: none;
+            margin: 0;
+            pointer-events: none;
+        }
+        .sentiment-track input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #fff;
+            border: 2px solid #6366f1;
+            box-shadow: 0 1px 6px rgba(0,0,0,.18);
+            cursor: pointer;
+            pointer-events: all;
+            transition: border-color .15s, box-shadow .15s;
+        }
+        .sentiment-track input[type=range]::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #fff;
+            border: 2px solid #6366f1;
+            box-shadow: 0 1px 6px rgba(0,0,0,.18);
+            cursor: pointer;
+            pointer-events: all;
+        }
+        .sentiment-track input[type=range]::-webkit-slider-thumb:hover,
+        .sentiment-track input[type=range]:focus::-webkit-slider-thumb {
+            border-color: #4f46e5;
+            box-shadow: 0 0 0 4px rgba(99,102,241,.18);
+        }
+        .sentiment-labels {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.72rem;
+            font-weight: 600;
+            color: #94a3b8;
+            letter-spacing: .03em;
+            margin-top: 4px;
+        }
+        .sentiment-labels .neg { color: #ef4444; }
+        .sentiment-labels .pos { color: #22c55e; }
+        .sentiment-vals {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.78rem;
+            font-weight: 700;
+            margin-top: 2px;
+        }
+        .sentiment-vals .val-min { color: #ef4444; }
+        .sentiment-vals .val-max { color: #22c55e; }
+        .sentiment-info {
+            font-size: 0.7rem;
+            color: #94a3b8;
+            margin-top: 6px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .dark-mode .sentiment-labels { color: #64748b; }
     </style>
 @endsection
 
@@ -277,6 +367,47 @@
                     <label class="form-label">To Time</label>
                     <input type="time" class="input form-input-custom" name="to_time" @if(isset($_GET['to_time'])) value="{{$_GET['to_time']}}" @else value="23:59" @endif>
                 </div>
+
+                <!-- Row 5: Social Shares and Sentiment -->
+                <div class="col-span-12 md:col-span-6">
+                    <label class="form-label">Minimum shares on social media</label>
+                    <input type="number" class="input form-input-custom w-full" name="minSocialScore" placeholder="e.g. 50" @if(isset($_GET['minSocialScore'])) value="{{$_GET['minSocialScore']}}" @endif>
+                </div>
+                <div class="col-span-12 md:col-span-6">
+                    <label class="form-label">Sentiment</label>
+                    @php
+                        $sentMin = request('sentimentMin', '-1');
+                        $sentMax = request('sentimentMax', '1');
+                        $sentMin = is_numeric($sentMin) ? floatval($sentMin) : -1;
+                        $sentMax = is_numeric($sentMax) ? floatval($sentMax) : 1;
+                        $sentMin = max(-1, min(1, $sentMin));
+                        $sentMax = max(-1, min(1, $sentMax));
+                    @endphp
+                    <input type="hidden" name="sentimentMin" id="sentimentMinVal" value="{{ $sentMin }}">
+                    <input type="hidden" name="sentimentMax" id="sentimentMaxVal" value="{{ $sentMax }}">
+                    <div class="sentiment-slider-wrap">
+                        <div class="sentiment-vals">
+                            <span class="val-min" id="sentimentMinDisplay">{{ number_format($sentMin, 1) }}</span>
+                            <span class="val-max" id="sentimentMaxDisplay">{{ number_format($sentMax, 1) }}</span>
+                        </div>
+                        <div class="sentiment-track" id="sentimentTrack">
+                            <div class="sentiment-fill" id="sentimentFill"></div>
+                            <input type="range" id="sentimentRangeMin" min="-1" max="1" step="0.1"
+                                value="{{ $sentMin }}">
+                            <input type="range" id="sentimentRangeMax" min="-1" max="1" step="0.1"
+                                value="{{ $sentMax }}">
+                        </div>
+                        <div class="sentiment-labels">
+                            <span class="neg">&#8722; Negative</span>
+                            <span>Neutral</span>
+                            <span class="pos">Positive +</span>
+                        </div>
+                        <div class="sentiment-info">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                            Sentiment is computed for English articles only.
+                        </div>
+                    </div>
+                </div>
                 
                 <!-- Row 5: Actions -->
                 <div class="col-span-12 flex items-end justify-end gap-2 mt-2">
@@ -320,10 +451,16 @@
                     @if(count($data))
                         <?php $i=1; ?>
                         @foreach ($data as $row)
-
+                            @php
+                                $videoUrl = '';
+                                if (!empty($row['videos']) && is_array($row['videos'])) {
+                                    $firstVideo = reset($row['videos']);
+                                    $videoUrl = is_string($firstVideo) ? $firstVideo : ($firstVideo['url'] ?? '');
+                                }
+                            @endphp
                             <tr class="intro-x row1" data-id="{{ $i }}">
                                 <td class="w-8 text-center">
-                                    <input type="checkbox" class="news-select" data-idx="{{ $i }}" data-source="{{ $row['source']['name'] }}" data-author="{{ $row['author'] }}" data-title="{{ htmlspecialchars($row['title'], ENT_QUOTES) }}" data-description="{{ htmlspecialchars($row['description'], ENT_QUOTES) }}" data-url="{{ $row['url'] }}" data-urlToImage="{{ $row['urlToImage'] }}" data-publishedAt="{{ $row['publishedAt'] }}" data-content="{{ htmlspecialchars($row['content'], ENT_QUOTES) }}">
+                                    <input type="checkbox" class="news-select" data-idx="{{ $i }}" data-source="{{ $row['source']['name'] }}" data-author="{{ $row['author'] }}" data-title="{{ htmlspecialchars($row['title'], ENT_QUOTES) }}" data-description="{{ htmlspecialchars($row['description'], ENT_QUOTES) }}" data-url="{{ $row['url'] }}" data-urlToImage="{{ $row['urlToImage'] }}" data-publishedAt="{{ $row['publishedAt'] }}" data-content="{{ htmlspecialchars($row['content'], ENT_QUOTES) }}" data-video_url="{{ $videoUrl }}">
                                 </td>
                                 <td class="w-40">
                                     @if(isset($row['urlToImage']) && $row['urlToImage']!=null && $row['urlToImage']!='')
@@ -335,6 +472,23 @@
                                 <td >
                                     <a target="_blank" href="{{$row['url']}}" class="font-medium whitespace-no-wrap"><?php echo substr($row['title'], 0,90);?></a> 
                                     <div class="text-gray-600 text-xs"><?php echo substr($row['description'], 0,150)."........";?></div>
+                                    @if(isset($row['sentiment']))
+                                        <div class="mt-1 flex items-center gap-1">
+                                            @if($row['sentiment'] > 0.1)
+                                                <span class="px-2 py-0.5 text-xs font-semibold rounded bg-green-200 text-green-800">
+                                                    Positive ({{ round($row['sentiment'], 2) }})
+                                                </span>
+                                            @elseif($row['sentiment'] < -0.1)
+                                                <span class="px-2 py-0.5 text-xs font-semibold rounded bg-red-200 text-red-800">
+                                                    Negative ({{ round($row['sentiment'], 2) }})
+                                                </span>
+                                            @else
+                                                <span class="px-2 py-0.5 text-xs font-semibold rounded bg-gray-200 text-gray-800">
+                                                    Neutral ({{ round($row['sentiment'], 2) }})
+                                                </span>
+                                            @endif
+                                        </div>
+                                    @endif
                                 </td>
                                  <td>
                                     @if(isset($row['publishedAt']) && $row['publishedAt'] != '')
@@ -367,6 +521,7 @@
                                             <input type="hidden" name="urlToImage" value="{{$row['urlToImage']}}">
                                             <input type="hidden" name="publishedAt" value="{{$row['publishedAt']}}">
                                             <input type="hidden" name="content" value="{{$row['content']}}">
+                                            <input type="hidden" name="video_url" value="{{$videoUrl}}">
                                             <button trpe="submit" class="font-medium whitespace-no-wrap button text-white bg-theme-1"> {{__('admin.save_as_post')}}</button>
                                         </form>
 
@@ -454,7 +609,8 @@ $(document).ready(function(){
                 url: chk.getAttribute('data-url') || '',
                 urlToImage: chk.getAttribute('data-urlToImage') || chk.getAttribute('data-urltoimage') || '',
                 publishedAt: chk.getAttribute('data-publishedAt') || chk.getAttribute('data-publishedat') || '',
-                content: chk.getAttribute('data-content') || ''
+                content: chk.getAttribute('data-content') || '',
+                video_url: chk.getAttribute('data-video_url') || chk.getAttribute('data-video-url') || ''
             });
         });
 
@@ -619,6 +775,52 @@ $(document).ready(function(){
 function resetFilter() {
     window.location.href = "{{ url()->current() }}";
 }
+
+/* ── Sentiment dual-range slider logic ── */
+(function() {
+    var trackEl   = document.getElementById('sentimentTrack');
+    var fillEl    = document.getElementById('sentimentFill');
+    var rangeMin  = document.getElementById('sentimentRangeMin');
+    var rangeMax  = document.getElementById('sentimentRangeMax');
+    var hiddenMin = document.getElementById('sentimentMinVal');
+    var hiddenMax = document.getElementById('sentimentMaxVal');
+    var dispMin   = document.getElementById('sentimentMinDisplay');
+    var dispMax   = document.getElementById('sentimentMaxDisplay');
+
+    if (!rangeMin || !rangeMax) return;
+
+    function valToPercent(v) { return ((parseFloat(v) + 1) / 2) * 100; }
+    function fmtVal(v) { return (parseFloat(v) >= 0 ? '+' : '') + parseFloat(v).toFixed(1); }
+
+    function updateSlider() {
+        var minV = parseFloat(rangeMin.value);
+        var maxV = parseFloat(rangeMax.value);
+        // Prevent crossing
+        if (minV > maxV) {
+            if (this === rangeMin) rangeMin.value = maxV;
+            else rangeMax.value = minV;
+            minV = parseFloat(rangeMin.value);
+            maxV = parseFloat(rangeMax.value);
+        }
+        var pMin = valToPercent(minV);
+        var pMax = valToPercent(maxV);
+        fillEl.style.left  = pMin + '%';
+        fillEl.style.width = (pMax - pMin) + '%';
+        hiddenMin.value = minV.toFixed(1);
+        hiddenMax.value = maxV.toFixed(1);
+        dispMin.textContent = fmtVal(minV);
+        dispMax.textContent = fmtVal(maxV);
+        // Colour the display values
+        dispMin.style.color = minV < -0.05 ? '#ef4444' : (minV > 0.05 ? '#22c55e' : '#94a3b8');
+        dispMax.style.color = maxV > 0.05  ? '#22c55e' : (maxV < -0.05 ? '#ef4444' : '#94a3b8');
+    }
+
+    rangeMin.addEventListener('input', updateSlider);
+    rangeMax.addEventListener('input', updateSlider);
+
+    // Initial render
+    updateSlider.call(rangeMin);
+})();
 
 $(document).on('change', '#pagination-per-page', function() {
     let perPage = $(this).val();

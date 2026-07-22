@@ -2,12 +2,94 @@
 
 @section('subhead')
     <title>{{ __('admin.edit_blog') }} - {{ setting('site_name') }}</title>
+    <script>
+    function translateContent(type) {
+        var editLang = $('#edit_lang_select').val();
+        if (!editLang) {
+            editLang = 'en'; // default
+        }
+        
+        var currentTitle = '';
+        var currentDesc = '';
+        var targetLang = (editLang === 'en') ? 'hi' : 'en';
+
+        if (type === 'title') {
+            currentTitle = $('#blogTitle').val() || '';
+            if (currentTitle.trim() === '') {
+                myToastr('Please enter a title to translate.', 'error');
+                return;
+            }
+        } else if (type === 'description') {
+            if (CKEDITOR.instances['blogdescription']) {
+                currentDesc = CKEDITOR.instances['blogdescription'].getData() || '';
+            }
+            if (currentDesc.trim() === '') {
+                myToastr('Please enter a description to translate.', 'error');
+                return;
+            }
+        }
+
+        var $translateBtn = (type === 'title') ? $('#translate_title_button') : $('#translate_desc_button');
+        var originalText = $translateBtn.html();
+        $translateBtn.prop('disabled', true).text('Translating...');
+
+        $.ajax({
+            type: 'POST',
+            url: base_url + '/translate-content',
+            data: JSON.stringify({
+                title: currentTitle,
+                description: currentDesc,
+                target_lang: targetLang
+            }),
+            contentType: 'application/json',
+            dataType: 'json',
+            success: function(response) {
+                $translateBtn.prop('disabled', false).html(originalText);
+                
+                if (response.error) {
+                    myToastr(response.error, 'error');
+                    return;
+                }
+
+                if (type === 'title') {
+                    var tTitle = response.translatedTitle || '';
+                    if (targetLang === 'hi') {
+                        if ($('#title_hi').length) { $('#title_hi').val(tTitle); }
+                        myToastr('Title translated to Hindi successfully!', 'success');
+                    } else {
+                        if ($('#title_en').length) { $('#title_en').val(tTitle); }
+                        myToastr('Title translated to English successfully!', 'success');
+                    }
+                } else if (type === 'description') {
+                    var tDesc = response.translatedDescription || '';
+                    if (targetLang === 'hi') {
+                        if ($('#description_hi').length) { $('#description_hi').val(tDesc); }
+                        myToastr('Description translated to Hindi successfully!', 'success');
+                    } else {
+                        if ($('#description_en').length) { $('#description_en').val(tDesc); }
+                        myToastr('Description translated to English successfully!', 'success');
+                    }
+                }
+            },
+            error: function(xhr) {
+                $translateBtn.prop('disabled', false).html(originalText);
+                var errorMsg = 'An error occurred during translation.';
+                if (xhr.responseJSON && xhr.responseJSON.error) {
+                    errorMsg = xhr.responseJSON.error;
+                }
+                myToastr(errorMsg, 'error');
+            }
+        });
+    }
+    </script>
+
 @endsection
 
 @section('subcontent')
     @include('../layout/components/top-bar')
 
 
+    <link href="https://cdn.jsdelivr.net/npm/@yaireo/tagify/dist/tagify.css" rel="stylesheet" type="text/css" />
     <style>
         .accordion-content {
             display: none;
@@ -121,6 +203,7 @@
                             onkeyup="convertToSlugIfEnglish(this.value)" onblur="convertToSlugIfEnglish(this.value)">
                     </div>
                     <div class="mt-3 float-right">
+                        <button type="button" id="translate_title_button" onclick="translateContent('title');" class="button w-auto bg-theme-1 text-white mr-2"><i data-feather="refresh-cw" class="w-4 h-4 mr-1 inline-block"></i> Translate Title</button>
                         <button type="button" id="rewrite_title_button" onclick="showtitlerewrite();"
                             class="button w-35 bg-theme-1 text-white">+ Rewrite Title</button>
                     </div>
@@ -216,10 +299,11 @@
                         </div>
                     </div>
                     <div class="mt-3 float-right">
+                        <button type="button" id="translate_desc_button" onclick="translateContent('description');" class="button w-auto bg-theme-1 text-white mr-2"><i data-feather="refresh-cw" class="w-4 h-4 mr-1 inline-block"></i> Translate Description</button>
                         <button type="button" id="rewrite_des_button" onclick="showdisrewrite();"
                             class="button w-35 bg-theme-1 text-white">+ Rewrite Description</button>
                     </div>
-                    <div class="mt-3 p-5">
+                    <div class="mt-3 p-5" style="clear: both;">
                         <div class="accordion">
                             <div class="accordion-content mt-3" id="accordionDes">
                                 <div class="grid grid-cols-12 gap-4 row-gap-3">
@@ -300,15 +384,25 @@
                             </div>
                         </div>
                     </div>
+                    @if(!empty($blog->original_description))
+                    <div class="mt-3" style="clear: both; padding-top: 15px;">
+                        <label class="form-label" style="font-weight: 600; color: #4a5568;">Original Description (Word Count: {{ count(preg_split('/\s+/u', trim(strip_tags($blog->original_description)), -1, PREG_SPLIT_NO_EMPTY)) }})</label>
+                        <div class="mt-2">
+                            <textarea class="input w-full border mt-2 bg-gray-100 dark:bg-dark-1" readonly disabled rows="12" style="resize: none; cursor: not-allowed; color: #718096; background-color: #f7fafc;">{{ strip_tags($blog->original_description) }}</textarea>
+                        </div>
+                    </div>
+                    @endif
                     <div class="mt-3">
                         <label>{{ __('admin.location') }}</label>
-                        <input type="text" class="input w-full border mt-2" name="location" id="location"
+                        <input name="location_tags" id="location_tags" class="input w-full border mt-2" placeholder="Added locations will appear here" value="">
+                        <input type="text" class="input w-full border mt-2" name="location_search" id="location_search"
                             data-role="locationinput" value=""
-                            placeholder="{{ __('admin.location_placeholder') }}">
+                            placeholder="Search and add another location...">
+                        <input type="hidden" name="location_tags_payload" id="location_tags_payload" value="">
                         <input type="text" name="latitude" id="latitude" style="display:none;"
-                            value="@if (isset($blog->latitude)) {{ $blog->latitude }} @endif">
+                            value="@if(isset($blog->latitude)){{$blog->latitude}}@endif">
                         <input type="text" name="longitude" id="longitude" style="display:none;"
-                            value="@if (isset($blog->longitude)) {{ $blog->longitude }} @endif">
+                            value="@if(isset($blog->longitude)){{$blog->longitude}}@endif">
                     </div>
 
                     <div class="mt-3">
@@ -452,10 +546,57 @@
                     </div>
 
                     <div class="mt-3">
-                        <label>{{ __('admin.youtube_url') }}</label>
-                        <input type="text" class="input w-full border mt-2" name="video_url"
+                        <label>{{ __('admin.youtube_url') }} / Video URL</label>
+                        <input type="text" class="input w-full border mt-2" name="video_url" id="video_url_input"
                             placeholder="{{ __('admin.youtube_url_placeholder') }}" value="{{ $blog->video_url }}">
+                        
+                        <div class="mt-3" id="video_preview_container">
+                            <label style="font-weight: 600;">Video Preview</label>
+                            <div class="video-section mt-2" id="video_preview_content" style="padding: 15px; background-color: #f9f9f9; border-radius: 8px; min-height: 150px; display: flex; align-items: center; justify-content: center; text-align: center; color: #888; border: 1px dashed #ccc; width: 100%;">
+                                @if(!empty($blog->video_url))
+                                    @if(\Helpers::getYoutubeEmbedUrl($blog->video_url))
+                                        <iframe width="100%" height="300" src="{{\Helpers::getYoutubeEmbedUrl($blog->video_url)}}" frameborder="0" allowfullscreen></iframe>
+                                    @elseif(preg_match('/\.(mp4|webm|ogg)$/i', $blog->video_url))
+                                        <video width="100%" height="auto" controls>
+                                            <source src="{{$blog->video_url}}" type="video/mp4">
+                                            Your browser does not support the video tag.
+                                        </video>
+                                    @else
+                                        <a href="{{$blog->video_url}}" target="_blank" style="background-color: #007bff; color: white; padding: 8px 15px; border-radius: 5px; text-decoration: none; display: inline-block; font-size: 14px;">Watch Video</a>
+                                    @endif
+                                @else
+                                    <span>Enter a valid video URL above to see preview here.</span>
+                                @endif
+                            </div>
+                        </div>
                     </div>
+
+                    <script>
+                        document.addEventListener('DOMContentLoaded', function () {
+                            const videoInput = document.querySelector('input[name="video_url"]');
+                            const previewContainer = document.getElementById('video_preview_container');
+                            const previewContent = document.getElementById('video_preview_content');
+
+                            if(videoInput) {
+                                videoInput.addEventListener('input', function() {
+                                    const url = this.value.trim();
+                                    if(!url) {
+                                        previewContent.innerHTML = '<span>Enter a valid video URL above to see preview here.</span>';
+                                        return;
+                                    }
+                                    
+                                    let ytMatch = url.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/i);
+                                    if(ytMatch && ytMatch[1]) {
+                                        previewContent.innerHTML = '<iframe width="100%" height="300" src="https://www.youtube.com/embed/' + ytMatch[1] + '" frameborder="0" allowfullscreen></iframe>';
+                                    } else if(url.match(/\.(mp4|webm|ogg)$/i)) {
+                                        previewContent.innerHTML = '<video width="100%" height="auto" controls><source src="' + url + '" type="video/mp4">Your browser does not support the video tag.</video>';
+                                    } else {
+                                        previewContent.innerHTML = '<a href="' + url + '" target="_blank" style="background-color: #007bff; color: white; padding: 8px 15px; border-radius: 5px; text-decoration: none; display: inline-block; font-size: 14px;">Watch Video</a>';
+                                    }
+                                });
+                            }
+                        });
+                    </script>
 
                     <div class="mt-3">
                         <div class="grid grid-cols-12 gap-4 row-gap-3">
@@ -704,38 +845,255 @@
         </div>
     </form>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@yaireo/tagify/dist/tagify.min.js"></script>
     <script src="https://maps.googleapis.com/maps/api/js?key={{ env('Google_api') }}&libraries=places"></script>
     <!-- It is required-inline JS to put here because following js are making dynamic from the admin setting -->
     <script>
         document.addEventListener('DOMContentLoaded', function () {
-    const input = document.querySelector('.source_url_input');
-    const button = document.querySelector('.source_url_button');
+            const input = document.querySelector('.source_url_input');
+            const button = document.querySelector('.source_url_button');
 
-    if (input && button) {
-        input.addEventListener('keyup', function () {
-            let val = input.value.trim();
-            // Auto prepend https:// if it looks like a domain
-            if (val && !/^https?:\/\//i.test(val)) {
-                val = 'https://' + val;
+            if (input && button) {
+                input.addEventListener('keyup', function () {
+                    let val = input.value.trim();
+                    // Auto prepend https:// if it looks like a domain
+                    if (val && !/^https?:\/\//i.test(val)) {
+                        val = 'https://' + val;
+                    }
+                    button.setAttribute('href', val || '#');
+                });
             }
-            button.setAttribute('href', val || '#');
         });
-    }
-});
+
         function initAutocomplete() {
-            const input = document.getElementById("location");
+            let tagifyInput = document.querySelector('#location_tags');
+            if (!tagifyInput || !window.Tagify) {
+                console.warn('Tagify could not be initialized for location selection.');
+                return;
+            }
+            let tagify = new window.Tagify(tagifyInput, {
+                enforceWhitelist: false,
+                editTags: false,
+            });
+
+            let locationsData = [];
+
+            function syncLocationPayload() {
+                const payloadInput = document.getElementById('location_tags_payload');
+                if (payloadInput) {
+                    payloadInput.value = JSON.stringify(locationsData);
+                }
+            }
+
+            function getReadableAddress(result) {
+                if (!result) return '';
+                
+                // If it is structured components (like from Geocoder or Places autocomplete)
+                if (result.address_components) {
+                    let components = result.address_components;
+                    let city = '';
+                    let state = '';
+                    let country = '';
+
+                    for (let i = 0; i < components.length; i++) {
+                        let types = components[i].types;
+                        if (types.includes('locality')) {
+                            city = components[i].long_name;
+                        } else if (types.includes('sublocality_level_1') && !city) {
+                            city = components[i].long_name;
+                        } else if (types.includes('administrative_area_level_2') && !city) {
+                            city = components[i].long_name;
+                        } else if (types.includes('administrative_area_level_1')) {
+                            state = components[i].long_name;
+                        } else if (types.includes('country')) {
+                            country = components[i].long_name;
+                        }
+                    }
+
+                    let parts = [];
+                    if (city) parts.push(city);
+                    if (state && state !== city) parts.push(state);
+                    if (country) parts.push(country);
+
+                    if (parts.length > 0) {
+                        return parts.join(', ');
+                    }
+                }
+                
+                return result.formatted_address || result.name || '';
+            }
+
+            function getBestGeocodedResult(results) {
+                if (!results || results.length === 0) return null;
+                
+                // Prefer locality (city), then state, then country to avoid plus codes and street numbers
+                const preferredTypes = ['locality', 'administrative_area_level_1', 'country'];
+                for (let type of preferredTypes) {
+                    for (let res of results) {
+                        if (res.types && res.types.includes(type)) {
+                            return res;
+                        }
+                    }
+                }
+                return results[0];
+            }
+
+            // Parse existing locations immediately to prevent race conditions on load
+            let existingLat = document.getElementById("latitude").value.trim();
+            let existingLng = document.getElementById("longitude").value.trim();
+            
+            if (existingLat && existingLat.startsWith('[')) {
+                try {
+                    let lats = JSON.parse(existingLat);
+                    let lngs = JSON.parse(existingLng);
+                    lats.forEach((lat, index) => {
+                        let lng = lngs[index];
+                        let parsedLat = parseFloat(lat);
+                        let parsedLng = parseFloat(lng);
+                        if (!isNaN(parsedLat) && !isNaN(parsedLng)) {
+                            locationsData.push({lat: parsedLat, lng: parsedLng, value: parsedLat + "," + parsedLng});
+                        }
+                    });
+                } catch(e) {}
+            } else if (existingLat && existingLat.trim() !== '') {
+                let parsedLat = parseFloat(existingLat);
+                let parsedLng = parseFloat(existingLng);
+                if (!isNaN(parsedLat) && !isNaN(parsedLng)) {
+                    locationsData.push({lat: parsedLat, lng: parsedLng, value: parsedLat + "," + parsedLng});
+                }
+            }
+
+            const geocoder = window.google && google.maps && google.maps.Geocoder ? new google.maps.Geocoder() : null;
+            
+            if (existingLat && existingLat.startsWith('[')) {
+                try {
+                    let lats = JSON.parse(existingLat);
+                    let lngs = JSON.parse(existingLng);
+                    lats.forEach((lat, index) => {
+                        let lng = lngs[index];
+                        let parsedLat = parseFloat(lat);
+                        let parsedLng = parseFloat(lng);
+                        if (geocoder && !isNaN(parsedLat) && !isNaN(parsedLng)) {
+                            geocoder.geocode({ location: { lat: parsedLat, lng: parsedLng } }, function(results, status) {
+                                if (status === "OK" && results && results.length > 0) {
+                                    let bestResult = getBestGeocodedResult(results);
+                                    let name = getReadableAddress(bestResult);
+                                    let loc = locationsData.find(l => l.lat === parsedLat && l.lng === parsedLng);
+                                    if (loc) {
+                                        loc.value = name;
+                                    }
+                                    tagify.addTags([{value: name, lat: parsedLat, lng: parsedLng}]);
+                                    syncLocationPayload();
+                                } else {
+                                    console.error("Geocoding failed for " + lat + "," + lng + " with status: " + status);
+                                    // Fallback tag if geocoding fails
+                                    tagify.addTags([{value: parsedLat + "," + parsedLng, lat: parsedLat, lng: parsedLng}]);
+                                }
+                            });
+                        }
+                    });
+                } catch(e) {}
+            } else if (existingLat && existingLat.trim() !== '') {
+                let parsedLat = parseFloat(existingLat);
+                let parsedLng = parseFloat(existingLng);
+                if (geocoder && !isNaN(parsedLat) && !isNaN(parsedLng)) {
+                    geocoder.geocode({ location: { lat: parsedLat, lng: parsedLng } }, function(results, status) {
+                        if (status === "OK" && results && results.length > 0) {
+                            let bestResult = getBestGeocodedResult(results);
+                            let name = getReadableAddress(bestResult);
+                            let loc = locationsData.find(l => l.lat === parsedLat && l.lng === parsedLng);
+                            if (loc) {
+                                loc.value = name;
+                            }
+                            tagify.addTags([{value: name, lat: parsedLat, lng: parsedLng}]);
+                            syncLocationPayload();
+                        } else {
+                            tagify.addTags([{value: parsedLat + "," + parsedLng, lat: parsedLat, lng: parsedLng}]);
+                        }
+                    });
+                }
+            }
+
+            tagify.on('add', function(e) {
+                if (e.detail.data.lat === undefined || e.detail.data.lng === undefined) {
+                    tagify.removeTags(e.detail.tag);
+                    alert("Please use the 'Search and add a location' field below to add locations.");
+                }
+            });
+
+            tagify.on('remove', function(e) {
+                locationsData = locationsData.filter(loc => loc.value !== e.detail.data.value);
+                updateHiddenInputs();
+                syncLocationPayload();
+            });
+
+            function updateHiddenInputs() {
+                if(locationsData.length === 0) {
+                    document.getElementById("latitude").value = '';
+                    document.getElementById("longitude").value = '';
+                    return;
+                }
+                let lats = locationsData.map(loc => loc.lat);
+                let lngs = locationsData.map(loc => loc.lng);
+                document.getElementById("latitude").value = JSON.stringify(lats);
+                document.getElementById("longitude").value = JSON.stringify(lngs);
+            }
+
+            const input = document.getElementById("location_search");
+            if (!input || !window.google || !google.maps || !google.maps.places) {
+                return;
+            }
             const autocomplete = new google.maps.places.Autocomplete(input);
+
+            function addLocationFromPlace(place) {
+                function processPlace(p) {
+                    if (!p || !p.geometry || !p.geometry.location) {
+                        alert("No details available for input: '" + (input.value || (p ? p.name : '')) + "'");
+                        return;
+                    }
+                    let lat = typeof p.geometry.location.lat === 'function' ? p.geometry.location.lat() : p.geometry.location.lat;
+                    let lng = typeof p.geometry.location.lng === 'function' ? p.geometry.location.lng() : p.geometry.location.lng;
+                    let name = getReadableAddress(p);
+                    
+                    let exists = locationsData.some(loc => Math.abs(loc.lat - lat) < 0.0001 && Math.abs(loc.lng - lng) < 0.0001);
+                    if (!exists) {
+                        locationsData.push({lat: lat, lng: lng, value: name});
+                        tagify.addTags([{value: name, lat: lat, lng: lng}]);
+                        updateHiddenInputs();
+                        syncLocationPayload();
+                    }
+                    setTimeout(() => { input.value = ''; }, 100);
+                }
+
+                if (place && place.geometry && place.geometry.location) {
+                    processPlace(place);
+                } else {
+                    let query = (place && place.name) ? place.name : input.value;
+                    if (query && query.trim() !== '') {
+                        const geocoder = new google.maps.Geocoder();
+                        geocoder.geocode({ address: query }, function(results, status) {
+                            if (status === "OK" && results && results.length > 0) {
+                                let bestResult = typeof getBestGeocodedResult === 'function' ? getBestGeocodedResult(results) : results[0];
+                                processPlace(bestResult);
+                            } else {
+                                alert("No details available for input: '" + query + "'");
+                            }
+                        });
+                    }
+                }
+            }
 
             autocomplete.addListener("place_changed", function() {
                 const place = autocomplete.getPlace();
+                addLocationFromPlace(place);
+            });
 
-                if (!place.geometry) {
-                    alert("No details available for input: '" + place.name + "'");
-                    return;
+            input.addEventListener("keydown", function(e) {
+                if (e.key === "Enter") {
+                    e.preventDefault();
+                    const place = autocomplete.getPlace();
+                    addLocationFromPlace(place);
                 }
-
-                document.getElementById("latitude").value = place.geometry.location.lat();
-                document.getElementById("longitude").value = place.geometry.location.lng();
             });
         }
 
@@ -766,7 +1124,7 @@
         }
 
         window.onload = function() {
-            reverseGeocode();
+            // reverseGeocode(); // Disabled in favor of Tagify
         };
     </script>
     <script>
@@ -987,4 +1345,86 @@
     <script>
         // Accent/Voice selection is a single dropdown now; server derives the voice from the selected accent.
     </script>
+    <script>
+    function translateContent(type) {
+        var editLang = $('#edit_lang_select').val();
+        if (!editLang) {
+            editLang = 'en'; // default
+        }
+        
+        var currentTitle = '';
+        var currentDesc = '';
+        var targetLang = (editLang === 'en') ? 'hi' : 'en';
+
+        if (type === 'title') {
+            currentTitle = $('#blogTitle').val() || '';
+            if (currentTitle.trim() === '') {
+                myToastr('Please enter a title to translate.', 'error');
+                return;
+            }
+        } else if (type === 'description') {
+            if (CKEDITOR.instances['blogdescription']) {
+                currentDesc = CKEDITOR.instances['blogdescription'].getData() || '';
+            }
+            if (currentDesc.trim() === '') {
+                myToastr('Please enter a description to translate.', 'error');
+                return;
+            }
+        }
+
+        var $translateBtn = (type === 'title') ? $('#translate_title_button') : $('#translate_desc_button');
+        var originalText = $translateBtn.html();
+        $translateBtn.prop('disabled', true).text('Translating...');
+
+        $.ajax({
+            type: 'POST',
+            url: base_url + '/translate-content',
+            data: JSON.stringify({
+                title: currentTitle,
+                description: currentDesc,
+                target_lang: targetLang
+            }),
+            contentType: 'application/json',
+            dataType: 'json',
+            success: function(response) {
+                $translateBtn.prop('disabled', false).html(originalText);
+                
+                if (response.error) {
+                    myToastr(response.error, 'error');
+                    return;
+                }
+
+                if (type === 'title') {
+                    var tTitle = response.translatedTitle || '';
+                    if (targetLang === 'hi') {
+                        if ($('#title_hi').length) { $('#title_hi').val(tTitle); }
+                        myToastr('Title translated to Hindi successfully!', 'success');
+                    } else {
+                        if ($('#title_en').length) { $('#title_en').val(tTitle); }
+                        myToastr('Title translated to English successfully!', 'success');
+                    }
+                } else if (type === 'description') {
+                    var tDesc = response.translatedDescription || '';
+                    if (targetLang === 'hi') {
+                        if ($('#description_hi').length) { $('#description_hi').val(tDesc); }
+                        myToastr('Description translated to Hindi successfully!', 'success');
+                    } else {
+                        if ($('#description_en').length) { $('#description_en').val(tDesc); }
+                        myToastr('Description translated to English successfully!', 'success');
+                    }
+                }
+            },
+            error: function(xhr) {
+                $translateBtn.prop('disabled', false).html(originalText);
+                var errorMsg = 'An error occurred during translation.';
+                if (xhr.responseJSON && xhr.responseJSON.error) {
+                    errorMsg = xhr.responseJSON.error;
+                }
+                myToastr(errorMsg, 'error');
+            }
+        });
+    }
+    </script>
+
 @endsection
+

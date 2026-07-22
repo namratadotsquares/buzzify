@@ -57,30 +57,65 @@ class Kernel extends ConsoleKernel
     {
 
         $schedule->call(function () {
-        $newsdelet = SiteContent::find(64);
-        $deleted_days_limit = (int)$newsdelet->value;
-        $dateBeforeSixDays = Carbon::now()->subDays($deleted_days_limit)->toDateString();
+            // Retrieve dynamic settings
+            $featureSetting = SiteContent::where('key', 'feature_category_auto_remove')->first();
+            $personalSetting = SiteContent::where('key', 'personal_category_auto_remove')->first();
+            $otherSetting = SiteContent::where('key', 'news_deletion')->first();
 
-       
-       $blog = Blog::where('schedule_date', '<', $dateBeforeSixDays)->where('status',1)->get();
-       foreach($blog as $blogs)
-       {
-           $blogImage = BlogImages::where('blog_id',$blogs->id)->get();
-           foreach($blogImage as $blogImages)
-           {
-                $imageUrl = 'upload/blog/banner/360/' . $blogImages->image;
-                $fullImagePath = public_path($imageUrl);
-                
-                if (file_exists($fullImagePath)) {
-                    unlink($fullImagePath);
+            $featureDays = $featureSetting ? (int)$featureSetting->value : 1;
+            $personalDays = $personalSetting ? (int)$personalSetting->value : 7;
+            $otherHours = $otherSetting ? (int)$otherSetting->value : 48;
+
+            // 1. Featured News: Un-feature older than $featureDays days
+            if ($featureDays > 0) {
+                $featureThreshold = Carbon::now()->subDays($featureDays)->toDateTimeString();
+                Blog::where('schedule_date', '<', $featureThreshold)
+                    ->where('status', 1)
+                    ->where(function ($q) {
+                        $q->where('is_featured', '1')->orWhere('is_slider', '1');
+                    })
+                    ->update(['is_featured' => '0', 'is_slider' => '0']);
+            }
+
+            // 2. YourBuzz (Personalization Category ID 12) News: Delete older than $personalDays days
+            if ($personalDays > 0) {
+                $personalThreshold = Carbon::now()->subDays($personalDays)->toDateTimeString();
+                $personalBlogs = Blog::where('schedule_date', '<', $personalThreshold)
+                    ->where('category_id', 12) // Personalization ID
+                    ->get();
+
+                foreach ($personalBlogs as $blog) {
+                    $images = BlogImages::where('blog_id', $blog->id)->get();
+                    foreach ($images as $img) {
+                        $fullImagePath = public_path('upload/blog/banner/360/' . $img->image);
+                        if (file_exists($fullImagePath)) {
+                            unlink($fullImagePath);
+                        }
+                        $img->delete();
+                    }
+                    $blog->delete();
                 }
-                $deleteImage = BlogImages::find($blogImages->id);
-                $deleteImage->delete();
-           }
-        $deleteblog = Blog::find($blogs->id);
-        $deleteblog->delete();
-       }
-            // Log::info('cron is deleted');
+            }
+
+            // 3. Other News (All categories except 12): Delete older than $otherHours hours
+            if ($otherHours > 0) {
+                $otherThreshold = Carbon::now()->subHours($otherHours)->toDateTimeString();
+                $otherBlogs = Blog::where('schedule_date', '<', $otherThreshold)
+                    ->where('category_id', '!=', 12)
+                    ->get();
+
+                foreach ($otherBlogs as $blog) {
+                    $images = BlogImages::where('blog_id', $blog->id)->get();
+                    foreach ($images as $img) {
+                        $fullImagePath = public_path('upload/blog/banner/360/' . $img->image);
+                        if (file_exists($fullImagePath)) {
+                            unlink($fullImagePath);
+                        }
+                        $img->delete();
+                    }
+                    $blog->delete();
+                }
+            }
         })->everyMinute();
 
        

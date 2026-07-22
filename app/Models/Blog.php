@@ -40,6 +40,8 @@ class Blog extends Model
         'url',
         'source_name',
         'description',
+        'original_description',
+        'video_url',
         'created_by',
         'category_id',
         'content_type',
@@ -139,6 +141,7 @@ class Blog extends Model
 
             $id = 0;
 
+            $data['updated_at'] = date("Y-m-d H:i:s");
             if ($id = $template->where('id', $data['id'])->update($data)) {
 
                 return ['status' => true, 'message' => "Blog updated sucessfully", 'id' => $id];

@@ -128,6 +128,8 @@ class BlogAPIController extends Controller
                     $query->whereNotIn('id', $readids);
                 })
                 ->orderBy('schedule_date', 'DESC')
+                ->orderBy('updated_at', 'DESC')
+                ->orderBy('id', 'DESC')
                 ->paginate($pagination_no)
                 ->appends('per_page', $pagination_no);
 
@@ -637,7 +639,9 @@ class BlogAPIController extends Controller
                         }
                     });
                 })
-                ->orderBy('created_at', 'DESC');
+                ->orderBy('schedule_date', 'DESC')
+                ->orderBy('updated_at', 'DESC')
+                ->orderBy('id', 'DESC');
 
 
             if (!empty($readids)) {

@@ -4,6 +4,87 @@
 
 @section('subhead') 
     <title>{{ __('admin.add_blog') }} - {{ setting('site_name') }}</title> 
+    <script>
+    function translateContent(type) {
+        var editLang = $('#edit_lang_select').val();
+        if (!editLang) {
+            editLang = 'en'; // default
+        }
+        
+        var currentTitle = '';
+        var currentDesc = '';
+        var targetLang = (editLang === 'en') ? 'hi' : 'en';
+
+        if (type === 'title') {
+            currentTitle = $('#blogTitle').val() || '';
+            if (currentTitle.trim() === '') {
+                myToastr('Please enter a title to translate.', 'error');
+                return;
+            }
+        } else if (type === 'description') {
+            if (CKEDITOR.instances['blogdescription']) {
+                currentDesc = CKEDITOR.instances['blogdescription'].getData() || '';
+            }
+            if (currentDesc.trim() === '') {
+                myToastr('Please enter a description to translate.', 'error');
+                return;
+            }
+        }
+
+        var $translateBtn = (type === 'title') ? $('#translate_title_button') : $('#translate_desc_button');
+        var originalText = $translateBtn.html();
+        $translateBtn.prop('disabled', true).text('Translating...');
+
+        $.ajax({
+            type: 'POST',
+            url: base_url + '/translate-content',
+            data: JSON.stringify({
+                title: currentTitle,
+                description: currentDesc,
+                target_lang: targetLang
+            }),
+            contentType: 'application/json',
+            dataType: 'json',
+            success: function(response) {
+                $translateBtn.prop('disabled', false).html(originalText);
+                
+                if (response.error) {
+                    myToastr(response.error, 'error');
+                    return;
+                }
+
+                if (type === 'title') {
+                    var tTitle = response.translatedTitle || '';
+                    if (targetLang === 'hi') {
+                        if ($('#title_hi').length) { $('#title_hi').val(tTitle); }
+                        myToastr('Title translated to Hindi successfully!', 'success');
+                    } else {
+                        if ($('#title_en').length) { $('#title_en').val(tTitle); }
+                        myToastr('Title translated to English successfully!', 'success');
+                    }
+                } else if (type === 'description') {
+                    var tDesc = response.translatedDescription || '';
+                    if (targetLang === 'hi') {
+                        if ($('#description_hi').length) { $('#description_hi').val(tDesc); }
+                        myToastr('Description translated to Hindi successfully!', 'success');
+                    } else {
+                        if ($('#description_en').length) { $('#description_en').val(tDesc); }
+                        myToastr('Description translated to English successfully!', 'success');
+                    }
+                }
+            },
+            error: function(xhr) {
+                $translateBtn.prop('disabled', false).html(originalText);
+                var errorMsg = 'An error occurred during translation.';
+                if (xhr.responseJSON && xhr.responseJSON.error) {
+                    errorMsg = xhr.responseJSON.error;
+                }
+                myToastr(errorMsg, 'error');
+            }
+        });
+    }
+    </script>
+
 @endsection 
 
 
@@ -12,6 +93,7 @@
     @include('../layout/components/top-bar')
 
     <link href="{{ asset('dist/css/tagsinput.css') }}" rel="stylesheet" type="text/css">
+    <link href="https://cdn.jsdelivr.net/npm/@yaireo/tagify/dist/tagify.css" rel="stylesheet" type="text/css" />
     <style>
         .accordion-content {
             display: none;
@@ -125,6 +207,7 @@
 
                     </div>
                       <div class="mt-3 float-right">
+                          <button type="button" id="translate_title_button" onclick="translateContent('title');" class="button w-auto bg-theme-1 text-white mr-2"><i data-feather="refresh-cw" class="w-4 h-4 mr-1 inline-block"></i> Translate Title</button>
                           <button type="button" id="rewrite_title_button" onclick="showtitlerewrite();" class="button w-35 bg-theme-1 text-white">+ Rewrite Title</button>
                     </div>
                     <div class="mt-3 p-5">
@@ -218,6 +301,7 @@
 
                         </div>
                            <div class="mt-3 float-right">
+                        <button type="button" id="translate_desc_button" onclick="translateContent('description');" class="button w-auto bg-theme-1 text-white mr-2"><i data-feather="refresh-cw" class="w-4 h-4 mr-1 inline-block"></i> Translate Description</button>
                        <button type="button" id="rewrite_des_button" onclick="showdisrewrite();" class="button w-35 bg-theme-1 text-white">+ Rewrite Description</button>
                     </div>
                     <div class="mt-3 p-5">
@@ -300,9 +384,11 @@
                     </div>
                     <div class="mt-3">
                         <label>{{__('admin.location')}}</label>
-                        <input type="text" class="input w-full border mt-2" name="location" id="location" data-role="locationinput" value="" placeholder="{{__('admin.location_placeholder')}}" >
-                        <input type="text" name="latitude"  id="latitude" style="display:none;" value="@if(isset($blog->latitude)) {{$blog->latitude}} @endif">
-                        <input type="text" name="longitude"  id="longitude" style="display:none;"  value="@if(isset($blog->longitude)) {{$blog->longitude}} @endif">
+                        <input name="location_tags" id="location_tags" class="input w-full border mt-2" placeholder="Added locations will appear here">
+                        <input type="text" class="input w-full border mt-2" name="location_search" id="location_search" data-role="locationinput" value="" placeholder="Search and add a location..." >
+                        <input type="hidden" name="location_tags_payload" id="location_tags_payload" value="">
+                        <input type="text" name="latitude"  id="latitude" style="display:none;" value="@if(isset($blog->latitude)){{$blog->latitude}}@endif">
+                        <input type="text" name="longitude"  id="longitude" style="display:none;"  value="@if(isset($blog->longitude)){{$blog->longitude}}@endif">
                     </div>
                     <div class="mt-3">
                         <label class="cursor-pointer select-none width-25" for="check_location_radius">{{__('admin.check_location_radius')}}</label>
@@ -896,6 +982,7 @@
         </div>
 
     </form>
+    <script src="https://cdn.jsdelivr.net/npm/@yaireo/tagify/dist/tagify.min.js"></script>
     <script src="https://maps.googleapis.com/maps/api/js?key={{env('Google_api')}}&loading=async&libraries=places"></script>
     <!-- It is required-inline JS to put here because following js are making dynamic from the admin setting -->
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
@@ -1068,19 +1155,138 @@
         });
 
         $(window).on('load', function() {
-            const input = document.getElementById("location");
+            let tagifyInput = document.querySelector('#location_tags');
+            if(!tagifyInput || !window.Tagify) {
+                console.warn('Tagify could not be initialized for location selection.');
+                return;
+            }
+            
+            let tagify = new window.Tagify(tagifyInput, {
+                enforceWhitelist: false,
+                editTags: false,
+            });
+
+            let locationsData = [];
+
+            function syncLocationPayload() {
+                const payloadInput = document.getElementById('location_tags_payload');
+                if (payloadInput) {
+                    payloadInput.value = JSON.stringify(locationsData);
+                }
+            }
+
+            function getReadableAddress(result) {
+                if (!result || !result.address_components) return result ? (result.formatted_address || result.name || '') : '';
+                let components = result.address_components;
+                let city = '';
+                let state = '';
+                let country = '';
+
+                for (let i = 0; i < components.length; i++) {
+                    let types = components[i].types;
+                    if (types.includes('locality')) {
+                        city = components[i].long_name;
+                    } else if (types.includes('sublocality_level_1') && !city) {
+                        city = components[i].long_name;
+                    } else if (types.includes('administrative_area_level_2') && !city) {
+                        city = components[i].long_name;
+                    } else if (types.includes('administrative_area_level_1')) {
+                        state = components[i].long_name;
+                    } else if (types.includes('country')) {
+                        country = components[i].long_name;
+                    }
+                }
+
+                let parts = [];
+                if (city) parts.push(city);
+                if (state && state !== city) parts.push(state);
+                if (country) parts.push(country);
+
+                if (parts.length > 0) {
+                    return parts.join(', ');
+                }
+                return result.formatted_address || result.name || '';
+            }
+
+            tagify.on('add', function(e) {
+                if (e.detail.data.lat === undefined || e.detail.data.lng === undefined) {
+                    tagify.removeTags(e.detail.tag);
+                    alert("Please use the 'Search and add a location' field below to add locations.");
+                }
+            });
+
+            tagify.on('remove', function(e) {
+                locationsData = locationsData.filter(loc => loc.value !== e.detail.data.value);
+                updateHiddenInputs();
+                syncLocationPayload();
+            });
+
+            function updateHiddenInputs() {
+                if(locationsData.length === 0) {
+                    $('#latitude').val('');
+                    $('#longitude').val('');
+                    return;
+                }
+                let lats = locationsData.map(loc => loc.lat);
+                let lngs = locationsData.map(loc => loc.lng);
+                $('#latitude').val(JSON.stringify(lats));
+                $('#longitude').val(JSON.stringify(lngs));
+            }
+
+            const input = document.getElementById("location_search");
             if (!input || !window.google || !google.maps || !google.maps.places) {
                 return;
             }
             const autocomplete = new google.maps.places.Autocomplete(input);
+
+            function addLocationFromPlace(place) {
+                function processPlace(p) {
+                    if (!p || !p.geometry || !p.geometry.location) {
+                        alert("No details available for input: '" + (input.value || (p ? p.name : '')) + "'");
+                        return;
+                    }
+                    let lat = typeof p.geometry.location.lat === 'function' ? p.geometry.location.lat() : p.geometry.location.lat;
+                    let lng = typeof p.geometry.location.lng === 'function' ? p.geometry.location.lng() : p.geometry.location.lng;
+                    let name = getReadableAddress(p);
+                    
+                    let exists = locationsData.some(loc => Math.abs(loc.lat - lat) < 0.0001 && Math.abs(loc.lng - lng) < 0.0001);
+                    if (!exists) {
+                        locationsData.push({lat: lat, lng: lng, value: name});
+                        tagify.addTags([{value: name, lat: lat, lng: lng}]);
+                        updateHiddenInputs();
+                        syncLocationPayload();
+                    }
+                    setTimeout(() => { input.value = ''; }, 100);
+                }
+
+                if (place && place.geometry && place.geometry.location) {
+                    processPlace(place);
+                } else {
+                    let query = (place && place.name) ? place.name : input.value;
+                    if (query && query.trim() !== '') {
+                        const geocoder = new google.maps.Geocoder();
+                        geocoder.geocode({ address: query }, function(results, status) {
+                            if (status === "OK" && results && results.length > 0) {
+                                processPlace(results[0]);
+                            } else {
+                                alert("No details available for input: '" + query + "'");
+                            }
+                        });
+                    }
+                }
+            }
+
             autocomplete.addListener("place_changed", function() {
                 const place = autocomplete.getPlace();
-                if (!place.geometry) {
-                    alert("No details available for input: '" + place.name + "'");
-                    return;
+                addLocationFromPlace(place);
+            });
+
+            input.addEventListener("keydown", function(e) {
+                if (e.key === "Enter") {
+                    e.preventDefault();
+                    const place = autocomplete.getPlace();
+                    addLocationFromPlace(place);
                 }
-                $('#latitude').val(place.geometry.location.lat());
-                $('#longitude').val(place.geometry.location.lng());
             });
         });
     </script>
@@ -1156,4 +1362,86 @@
     <script>
         // Accent/Voice selection is a single dropdown now; server derives the voice from the selected accent.
     </script>
+    <script>
+    function translateContent(type) {
+        var editLang = $('#edit_lang_select').val();
+        if (!editLang) {
+            editLang = 'en'; // default
+        }
+        
+        var currentTitle = '';
+        var currentDesc = '';
+        var targetLang = (editLang === 'en') ? 'hi' : 'en';
+
+        if (type === 'title') {
+            currentTitle = $('#blogTitle').val() || '';
+            if (currentTitle.trim() === '') {
+                myToastr('Please enter a title to translate.', 'error');
+                return;
+            }
+        } else if (type === 'description') {
+            if (CKEDITOR.instances['blogdescription']) {
+                currentDesc = CKEDITOR.instances['blogdescription'].getData() || '';
+            }
+            if (currentDesc.trim() === '') {
+                myToastr('Please enter a description to translate.', 'error');
+                return;
+            }
+        }
+
+        var $translateBtn = (type === 'title') ? $('#translate_title_button') : $('#translate_desc_button');
+        var originalText = $translateBtn.html();
+        $translateBtn.prop('disabled', true).text('Translating...');
+
+        $.ajax({
+            type: 'POST',
+            url: base_url + '/translate-content',
+            data: JSON.stringify({
+                title: currentTitle,
+                description: currentDesc,
+                target_lang: targetLang
+            }),
+            contentType: 'application/json',
+            dataType: 'json',
+            success: function(response) {
+                $translateBtn.prop('disabled', false).html(originalText);
+                
+                if (response.error) {
+                    myToastr(response.error, 'error');
+                    return;
+                }
+
+                if (type === 'title') {
+                    var tTitle = response.translatedTitle || '';
+                    if (targetLang === 'hi') {
+                        if ($('#title_hi').length) { $('#title_hi').val(tTitle); }
+                        myToastr('Title translated to Hindi successfully!', 'success');
+                    } else {
+                        if ($('#title_en').length) { $('#title_en').val(tTitle); }
+                        myToastr('Title translated to English successfully!', 'success');
+                    }
+                } else if (type === 'description') {
+                    var tDesc = response.translatedDescription || '';
+                    if (targetLang === 'hi') {
+                        if ($('#description_hi').length) { $('#description_hi').val(tDesc); }
+                        myToastr('Description translated to Hindi successfully!', 'success');
+                    } else {
+                        if ($('#description_en').length) { $('#description_en').val(tDesc); }
+                        myToastr('Description translated to English successfully!', 'success');
+                    }
+                }
+            },
+            error: function(xhr) {
+                $translateBtn.prop('disabled', false).html(originalText);
+                var errorMsg = 'An error occurred during translation.';
+                if (xhr.responseJSON && xhr.responseJSON.error) {
+                    errorMsg = xhr.responseJSON.error;
+                }
+                myToastr(errorMsg, 'error');
+            }
+        });
+    }
+    </script>
+
 @endsection
+

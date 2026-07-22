@@ -79,24 +79,10 @@ class BlogController extends Controller
     private function resolveOpenAiRewriteModel(): string
     {
         // Default to a fast, cost-effective model for interactive rewrites.
-        $raw = (string) env('OPENAI_REWRITE_MODEL', 'gpt-4o-mini');
-        $model = trim($raw) !== '' ? trim($raw) : (string) env('OPENAI_MODEL', 'gpt-4o-mini');
+        $raw = (string) env('OPENAI_REWRITE_MODEL', '');
+        $model = trim($raw) !== '' ? trim($raw) : (string) env('OPENAI_MODEL', 'gpt-5-mini');
 
-        $normalized = strtolower(trim($model));
-        $aliases = [
-            'gpt4o mini' => 'gpt-4o-mini',
-            'gpt4o-mini' => 'gpt-4o-mini',
-            'gpt-4o mini' => 'gpt-4o-mini',
-            '4o-mini' => 'gpt-4o-mini',
-            'chatgpt5 mini' => 'gpt-5-mini',
-            'chatgpt-5-mini' => 'gpt-5-mini',
-            'chatgpt5-mini' => 'gpt-5-mini',
-            'gpt5 mini' => 'gpt-5-mini',
-            'gpt5-mini' => 'gpt-5-mini',
-            'gpt-5 mini' => 'gpt-5-mini',
-        ];
-
-        return $aliases[$normalized] ?? $model;
+        return \Helpers::resolveOpenAiModel($model);
     }
 
     private function openAiRewriteMaxCompletionTokens(): int
@@ -196,9 +182,25 @@ class BlogController extends Controller
         return trim($clipped);
     }
 
-    private function ensureCompleteSentences(string $text): string
+    private function removeEmDashes(string $text): string
     {
         $text = trim($text);
+        if ($text === '') {
+            return $text;
+        }
+
+        $text = preg_replace('/\s*[—–]\s*/u', ', ', $text);
+        $text = preg_replace('/\s*--\s*/', ', ', $text);
+        $text = str_replace(['—', '–'], '-', $text);
+        $text = preg_replace('/,\s*,+/', ',', $text);
+        $text = preg_replace('/\s\s+/', ' ', $text);
+
+        return trim($text);
+    }
+
+    private function ensureCompleteSentences(string $text): string
+    {
+        $text = $this->removeEmDashes($text);
         if ($text === '')
             return $text;
 
@@ -248,17 +250,31 @@ class BlogController extends Controller
             'connect_timeout' => $this->openAiRewriteConnectTimeoutSeconds(),
         ]);
 
-        $payload = [
-            'model' => $this->resolveOpenAiRewriteModel(),
-            'messages' => $messages,
-            'temperature' => $temperature,
-            // Chat Completions expects `max_tokens`. Some newer variants prefer `max_completion_tokens`.
-            // Start with `max_tokens` and swap automatically if the API rejects it.
-            'max_tokens' => $tokenLimit,
-            'top_p' => 1,
-            'frequency_penalty' => 0,
-            'presence_penalty' => 0,
-        ];
+        $model = $this->resolveOpenAiRewriteModel();
+        $isReasoningModel = \Helpers::isOpenAiReasoningModel($model);
+
+        if ($isReasoningModel) {
+            foreach ($messages as $i => $msg) {
+                if (isset($msg['role']) && $msg['role'] === 'system') {
+                    $messages[$i]['role'] = 'developer';
+                }
+            }
+            $payload = [
+                'model' => $model,
+                'messages' => $messages,
+                'max_completion_tokens' => max(2000, $tokenLimit),
+            ];
+        } else {
+            $payload = [
+                'model' => $model,
+                'messages' => $messages,
+                'temperature' => $temperature,
+                'max_tokens' => $tokenLimit,
+                'top_p' => 1,
+                'frequency_penalty' => 0,
+                'presence_penalty' => 0,
+            ];
+        }
 
         $headers = [
             'Content-Type' => 'application/json',
@@ -285,34 +301,35 @@ class BlogController extends Controller
                         'curl' => $curl,
                     ]);
                 } catch (\GuzzleHttp\Exception\RequestException $e) {
-                    // Some models reject certain optional parameters (e.g. temperature). If so, retry once without that param.
-                    $optionalParams = ['temperature', 'top_p', 'frequency_penalty', 'presence_penalty'];
                     $body = $e->hasResponse() ? (string) $e->getResponse()->getBody() : '';
                     $decoded = $body !== '' ? json_decode($body, true) : null;
-
-                    $param = null;
-                    if (is_array($decoded) && isset($decoded['error']['param']) && is_string($decoded['error']['param'])) {
-                        $param = $decoded['error']['param'];
+                    
+                    $isParamError = false;
+                    if (is_array($decoded) && isset($decoded['error'])) {
+                        $errMsg = $decoded['error']['message'] ?? '';
+                        $errParam = $decoded['error']['param'] ?? '';
+                        if (
+                            $errParam !== '' || 
+                            stripos($errMsg, 'unsupported parameter') !== false ||
+                            stripos($errMsg, 'unrecognized request argument') !== false ||
+                            stripos($errMsg, 'not supported') !== false
+                        ) {
+                            $isParamError = true;
+                        }
                     }
-                    if (
-                        !$param
-                        && is_array($decoded)
-                        && isset($decoded['error']['message'])
-                        && is_string($decoded['error']['message'])
-                        && preg_match('/Unrecognized request argument supplied: ([a-zA-Z0-9_]+)/', $decoded['error']['message'], $m)
-                    ) {
-                        $param = $m[1];
-                    }
 
-                    // Handle token parameter differences.
-                    if ($param === 'max_tokens' && array_key_exists('max_tokens', $payload)) {
-                        unset($payload['max_tokens']);
-                        $payload['max_completion_tokens'] = $tokenLimit;
-                    } elseif ($param === 'max_completion_tokens' && array_key_exists('max_completion_tokens', $payload)) {
-                        unset($payload['max_completion_tokens']);
-                        $payload['max_tokens'] = $tokenLimit;
-                    } elseif ($param && in_array($param, $optionalParams, true) && array_key_exists($param, $payload)) {
-                        unset($payload[$param]);
+                    if ($isParamError) {
+                        // Strip all optional parameters to prevent consecutive retries failing
+                        $optionalParams = ['temperature', 'top_p', 'frequency_penalty', 'presence_penalty'];
+                        foreach ($optionalParams as $param) {
+                            if (array_key_exists($param, $payload)) {
+                                unset($payload[$param]);
+                            }
+                        }
+                        if (array_key_exists('max_tokens', $payload)) {
+                            unset($payload['max_tokens']);
+                            $payload['max_completion_tokens'] = max(2000, $tokenLimit);
+                        }
                     } else {
                         throw $e;
                     }
@@ -457,7 +474,8 @@ class BlogController extends Controller
             if ($fieldType === 'title') {
                 $fieldSpecificRules .= "- Output a high-impact, urgent news bulletin headline (internal 'Breaking News' style).\n";
                 $fieldSpecificRules .= "- Use 'Bulletin' format: extremely direct, minimal, and punchy.\n";
-                $fieldSpecificRules .= "- Use internal punctuation like colons (:) or dashes (—) instead of conjunctions (e.g., 'Bhabanipur Polls: Mamata Files Nomination').\n";
+                $fieldSpecificRules .= "- Use internal punctuation like colons (:) or standard hyphens (-) instead of conjunctions (e.g., 'Bhabanipur Polls: Mamata Files Nomination').\n";
+                $fieldSpecificRules .= "- DO NOT use em dashes (—), en dashes (–), or double hyphens (--). Use standard commas, colons, or periods instead.\n";
                 $fieldSpecificRules .= "- Use 'Headlinese': omit articles (a, an, the) and forms of 'to be' (is, are, was, were).\n";
                 $fieldSpecificRules .= "- Always use present tense for recent events.\n";
                 $fieldSpecificRules .= "- NEVER end the headline with a period or any punctuation at the very end.\n";
@@ -627,11 +645,19 @@ class BlogController extends Controller
                 $transResponse = $this->callOpenAiChatCompletions($translateMessages, 0.3, $transMaxTokens);
                 $translatedText = trim((string) ($transResponse['choices'][0]['message']['content'] ?? ''));
                 $translatedText = trim($translatedText, "\"' \t\n\r\0\x0B");
-                if ($fieldType === 'description' && $translatedText !== '') {
-                    $translatedText = $this->ensureCompleteSentences($translatedText);
-                }
-                if ($fieldType === 'title') {
-                    $translatedText = rtrim($translatedText, ".");
+                
+                if ($translatedText !== '') {
+                    $transCount = $this->countWords($translatedText);
+                    if ($transCount > $maxWords) {
+                        $translatedText = $this->clipToMaxWords($translatedText, $maxWords, ($fieldType !== 'title'));
+                    }
+                    
+                    if ($fieldType === 'description') {
+                        $translatedText = $this->ensureCompleteSentences($translatedText);
+                    }
+                    if ($fieldType === 'title') {
+                        $translatedText = rtrim($translatedText, ".");
+                    }
                 }
             }
 
@@ -653,6 +679,76 @@ class BlogController extends Controller
             return response()->json(['error' => 'Internal error: ' . $e->getMessage()], 500);
         }
     }
+
+    public function translateContent(Request $request)
+    {
+        if ((bool) setting('openai_quota_expired')) {
+            return response()->json(['error' => 'OpenAI API quota exceeded.'], 403);
+        }
+
+        $title = trim((string) $request->input('title', ''));
+        $description = trim((string) $request->input('description', ''));
+        $targetLang = trim((string) $request->input('target_lang', ''));
+        
+        if (($title === '' && $description === '') || $targetLang === '') {
+            return response()->json(['error' => 'Missing required fields for translation.'], 400);
+        }
+
+        $oppositeLangName = ($targetLang === 'hi') ? 'Hindi' : 'English';
+        
+        $responseBody = [
+            'translatedTitle' => '',
+            'translatedDescription' => ''
+        ];
+
+        try {
+            // Translate Title
+            if ($title !== '') {
+                $translateSystemPrompt = "You are a professional news translator. Translate the following news title into {$oppositeLangName}.\nMaintain the same news style, tone, and formatting.\nOutput plain text only.";
+                $messages = [
+                    ['role' => 'system', 'content' => $translateSystemPrompt],
+                    ['role' => 'user', 'content' => $title],
+                ];
+                // Max tokens around 1.5x of a typical title
+                $transResponse = $this->callOpenAiChatCompletions($messages, 0.3, 100);
+                $translatedTitle = trim((string) ($transResponse['choices'][0]['message']['content'] ?? ''));
+                $translatedTitle = rtrim(trim($translatedTitle, "\"' \t\n\r\0\x0B"), ".");
+                $responseBody['translatedTitle'] = $translatedTitle;
+            }
+
+            // Translate Description
+            if ($description !== '') {
+                $translateSystemPrompt = "You are a professional news translator. Translate the following news description into {$oppositeLangName}.\nMaintain the same news style, tone, and formatting.\nOutput plain text only.";
+                $messages = [
+                    ['role' => 'system', 'content' => $translateSystemPrompt],
+                    ['role' => 'user', 'content' => $description],
+                ];
+                // Estimate tokens: 1 word = ~1.5 tokens, so max 1000 words = 1500 tokens * 1.5 multiplier for Hindi = 2250.
+                $wordCount = $this->wordCountClean($description);
+                $maxTokens = $this->estimateRewriteMaxTokens($wordCount) * 1.5;
+                if ($maxTokens < 300) $maxTokens = 300;
+                
+                $transResponse = $this->callOpenAiChatCompletions($messages, 0.3, (int)$maxTokens);
+                $translatedDesc = trim((string) ($transResponse['choices'][0]['message']['content'] ?? ''));
+                $translatedDesc = trim($translatedDesc, "\"' \t\n\r\0\x0B");
+                $translatedDesc = $this->ensureCompleteSentences($translatedDesc);
+                $responseBody['translatedDescription'] = $translatedDesc;
+            }
+
+            \Helpers::clearOpenAiQuotaExpired();
+            return response()->json($responseBody);
+
+        } catch (\GuzzleHttp\Exception\RequestException $e) {
+            $body = $e->hasResponse() ? (string) $e->getResponse()->getBody() : $e->getMessage();
+            \Helpers::markOpenAiQuotaExpiredIfNeeded($body);
+            \Log::error('OpenAI Error: ' . $e->getMessage());
+            return response()->json(['error' => 'Internal error: ' . $e->getMessage()], 500);
+        } catch (\Exception $e) {
+            \Log::error('OpenAI Error: ' . $e->getMessage());
+            return response()->json(['error' => 'Internal error: ' . $e->getMessage()], 500);
+        }
+    }
+
     public function generateImage(Request $request)
     {
 
@@ -1549,12 +1645,30 @@ class BlogController extends Controller
 
             $postData = $post;
 
+            $translationsInput = [
+                'en' => [
+                    'title' => $postData['title_en'] ?? ($postData['title'] ?? null),
+                    'description' => $postData['description_en'] ?? ($postData['description'] ?? null),
+                ],
+                'hi' => [
+                    'title' => $postData['title_hi'] ?? null,
+                    'description' => $postData['description_hi'] ?? null,
+                ],
+            ];
+            if (array_key_exists('title_en', $postData)) {
+                $postData['title'] = $postData['title_en'];
+            }
+            if (array_key_exists('description_en', $postData)) {
+                $postData['description'] = $postData['description_en'];
+            }
+
             // Remove AI helper and translation fields to prevent SQL Unknown Column errors
             unset(
                 $postData['tone'], $postData['creativity'], $postData['sentimate'], 
                 $postData['words'], $postData['location'], $postData['translate'],
                 $postData['edit_lang'], $postData['title_en'], $postData['title_hi'],
-                $postData['description_en'], $postData['description_hi']
+                $postData['description_en'], $postData['description_hi'],
+                $postData['location_tags'], $postData['location_search'], $postData['location_tags_payload']
             );
 
             if (isset($postData['image'])) {
@@ -1762,36 +1876,52 @@ class BlogController extends Controller
                         }
                     }
 
-                    for ($g = 0; $g < count($languages); $g++) {
+                    $upsertTestTranslation = function (int $blogId, string $lang, array $values) {
+                        $now = date("Y-m-d H:i:s");
+                        $existing = BlogTranslation::where('blog_id', $blogId)->where('language_code', $lang)->first();
+                        if ($existing) {
+                            $values['updated_at'] = $now;
+                            BlogTranslation::where('id', $existing->id)->update($values);
+                            return $existing->id;
+                        }
+                        $values['blog_id'] = $blogId;
+                        $values['language_code'] = $lang;
+                        $values['created_at'] = $now;
+                        $values['updated_at'] = $now;
+                        return BlogTranslation::insertGetId($values);
+                    };
 
-                        $injectTransLation = array(
-
-                            'blog_id' => $id,
-
-                            'language_code' => $languages[$g],
-
-                            'title' => $postData['title'],
-
-                            'tags' => $postData['tags'],
-
-                            'description' => $postData['description'],
-
-                            'seo_title' => $postData['seo_title'],
-
-                            'seo_keyword' => $postData['seo_keyword'],
-
-                            'seo_tag' => $postData['seo_tag'],
-
-                            'seo_description' => $postData['seo_description'],
-
-                            'is_location_radius' => (isset($post['is_location_radius']) && $post['is_location_radius'] == 'on') ? 1 : 0,
-
-                            'created_at' => date("Y-m-d H:i:s"),
-
-                        );
-
-                        BlogTranslation::insertGetId($injectTransLation);
+                    $enTitle = $translationsInput['en']['title'] ?? ($postData['title'] ?? null);
+                    $enDescription = $translationsInput['en']['description'] ?? ($postData['description'] ?? null);
+                    $hiTitle = $translationsInput['hi']['title'] ?? '';
+                    $hiDescription = $translationsInput['hi']['description'] ?? '';
+                    if (trim((string) $hiTitle) === '') {
+                        $hiTitle = $enTitle;
                     }
+                    if (trim((string) strip_tags((string) $hiDescription)) === '') {
+                        $hiDescription = $enDescription;
+                    }
+
+                    $upsertTestTranslation((int) $id, 'en', [
+                        'title' => $enTitle,
+                        'description' => $enDescription,
+                        'tags' => $postData['tags'] ?? null,
+                        'seo_title' => $postData['seo_title'] ?? null,
+                        'seo_keyword' => $postData['seo_keyword'] ?? null,
+                        'seo_tag' => $postData['seo_tag'] ?? null,
+                        'seo_description' => $postData['seo_description'] ?? null,
+                        'is_location_radius' => (isset($post['is_location_radius']) && $post['is_location_radius'] == 'on') ? 1 : 0,
+                    ]);
+                    $upsertTestTranslation((int) $id, 'hi', [
+                        'title' => $hiTitle,
+                        'description' => $hiDescription,
+                        'tags' => $postData['tags'] ?? null,
+                        'seo_title' => $postData['seo_title'] ?? null,
+                        'seo_keyword' => $postData['seo_keyword'] ?? null,
+                        'seo_tag' => $postData['seo_tag'] ?? null,
+                        'seo_description' => $postData['seo_description'] ?? null,
+                        'is_location_radius' => (isset($post['is_location_radius']) && $post['is_location_radius'] == 'on') ? 1 : 0,
+                    ]);
 
                     return response(\Helpers::sendSuccessAjaxResponse(__('message_alerts.record_updated')));
                 } else {
@@ -2822,15 +2952,6 @@ class BlogController extends Controller
                 'description_hi' => [
                     'sometimes',
                     'nullable',
-                    function ($attribute, $value, $fail) {
-                        if (empty(trim((string) strip_tags((string) $value)))) return;
-                        $max_word = SiteContent::where('key', 'news_max_words')->first()->value ?? 60;
-                        $max_words = $max_word;
-                        $words = $this->wordCountClean($value);
-                        if ($words > $max_words) {
-                            $fail('The Hindi Description may not be more than ' . ($max_words) . ' words.');
-                        }
-                    },
                 ],
             ];
             $validator = Validator::make($post, $validate, [], [
@@ -2973,6 +3094,7 @@ class BlogController extends Controller
                 $postData['description'] = $postData['description_en'];
             }
             unset($postData['title_en'], $postData['title_hi'], $postData['description_en'], $postData['description_hi'], $postData['edit_lang']);
+            unset($postData['location_tags'], $postData['location_search'], $postData['location_tags_payload']);
 
             // Text-to-speech: single "Accent / Voice" select in UI.
             // Persist BOTH columns: `blog_accent_code` and `voice` (derived from accent).
@@ -3024,6 +3146,45 @@ class BlogController extends Controller
                 }
                 unset($postData['reimage']);
             }
+
+            // Normalize latitude and longitude to be JSON arrays of strings like NewsApiController
+            if (isset($postData['latitude']) && $postData['latitude'] !== '') {
+                $latVal = $postData['latitude'];
+                $lats = [];
+                if (is_array($latVal)) {
+                    $lats = $latVal;
+                } else if (is_string($latVal)) {
+                    $decoded = json_decode($latVal, true);
+                    if (is_array($decoded)) {
+                        $lats = $decoded;
+                    } else {
+                        $lats = [$latVal];
+                    }
+                }
+                $postData['latitude'] = json_encode(array_values(array_filter(array_map('strval', $lats))));
+            } else {
+                $postData['latitude'] = null;
+            }
+
+            if (isset($postData['longitude']) && $postData['longitude'] !== '') {
+                $lngVal = $postData['longitude'];
+                $lngs = [];
+                if (is_array($lngVal)) {
+                    $lngs = $lngVal;
+                } else if (is_string($lngVal)) {
+                    $decoded = json_decode($lngVal, true);
+                    if (is_array($decoded)) {
+                        $lngs = $decoded;
+                    } else {
+                        $lngs = [$lngVal];
+                    }
+                }
+                $postData['longitude'] = json_encode(array_values(array_filter(array_map('strval', $lngs))));
+            } else {
+                $postData['longitude'] = null;
+            }
+            
+            $postData['is_location_radius'] = (isset($post['is_location_radius']) && $post['is_location_radius'] == 'on') ? 1 : 0;
 
             if ($submittype !== 'update_only') {
                 // flags and fields normalization
@@ -3148,17 +3309,25 @@ class BlogController extends Controller
                         }
                     }
 
-                    // insert translations for languages
-                    if (!empty($languages)) {
-                        foreach ($languages as $lang) {
-                            $row = $prepareTranslationRow($id, $lang, $postData);
-                            // BlogTranslation::insertGetId($row);
-                        }
-                    } else {
-                        // if no languages provided, insert default 'en' translation (optional)
-                        $row = $prepareTranslationRow($id, 'en', $postData);
-                        // BlogTranslation::insertGetId($row);
+                    // Ensure English + Hindi translations are saved for the draft
+                    $enTitle = $translationsInput['en']['title'] ?? ($postData['title'] ?? null);
+                    $enDescription = $translationsInput['en']['description'] ?? ($postData['description'] ?? null);
+                    $hiTitle = $translationsInput['hi']['title'] ?? '';
+                    $hiDescription = $translationsInput['hi']['description'] ?? '';
+                    if (trim((string) $hiTitle) === '') {
+                        $hiTitle = $enTitle;
                     }
+                    if (trim((string) strip_tags((string) $hiDescription)) === '') {
+                        $hiDescription = $enDescription;
+                    }
+                    $upsertBlogTranslation((int) $id, 'en', [
+                        'title' => $enTitle,
+                        'description' => $enDescription,
+                    ]);
+                    $upsertBlogTranslation((int) $id, 'hi', [
+                        'title' => $hiTitle,
+                        'description' => $hiDescription,
+                    ]);
 
                     BlogActionLog::record('blog_draft_created', (int) $id, $actorId, [
                         'source' => 'admin_blog_form',
@@ -3179,14 +3348,21 @@ class BlogController extends Controller
                     if (isset($post['schedule_time']) && $post['schedule_time'] != '') {
                         $date = date("Y-m-d", strtotime($post['schedule_date']));
                         $time = date("H:i:s", strtotime($post['schedule_time']));
-                        $postData['schedule_date'] = $date . " " . $time;
+                        $schedTs = strtotime($date . " " . $time);
+                        if ($schedTs <= time()) {
+                            $postData['schedule_date'] = date("Y-m-d H:i:s");
+                        } else {
+                            $postData['schedule_date'] = $date . " " . $time;
+                        }
                     } else {
-                        // $postData['schedule_date'] = date("Y-m-d H:i:s");
+                        $postData['schedule_date'] = date("Y-m-d H:i:s");
                     }
+                } else {
+                    $postData['schedule_date'] = date("Y-m-d H:i:s");
                 }
                 $postData['status'] = 1;
                 
-                if ($detail && $detail->story_status > 0 && $detail->created_by) {
+                if ($detail && $detail->created_by) {
                     $user_id = $detail->created_by;
                     $user = \App\Models\User::find($user_id);
                     if ($user) {
@@ -3197,16 +3373,34 @@ class BlogController extends Controller
                             $tokens[] = $user->device_token;
                         }
                         
-                        $notiTitle = "Story Published";
-                        $notiDesc = "Your story has been approved and published in the buzz section.";
-                        
-                        if (!empty($tokens)) {
-                            $image = '';
-                            if (file_exists(public_path() . "/upload/logo/" . setting('site_logo'))) {
-                                $image = url('upload/logo') . '/' . setting('site_logo');
-                            } else {
-                                $image = url('upload/no-image.png');
+                        $categoryName = '';
+                        if (isset($post['category_id']) && is_array($post['category_id']) && count($post['category_id']) > 0) {
+                            $firstCatId = $post['category_id'][0];
+                            $category = \App\Models\Category::find($firstCatId);
+                            if ($category) {
+                                $categoryName = $category->name;
                             }
+                        } elseif ($detail) {
+                             $cat_id = \App\Models\BlogCategory::where('blog_id', $detail->id)->value('category_id');
+                             if($cat_id) {
+                                 $category = \App\Models\Category::find($cat_id);
+                                 if ($category) {
+                                     $categoryName = $category->name;
+                                 }
+                             }
+                        }
+
+                        $notiTitle = "Story Published";
+                        $notiDesc = "Your story has been published in '{$categoryName}' section.";
+                        
+                        $image = '';
+                        if (file_exists(public_path() . "/upload/logo/" . setting('site_logo'))) {
+                            $image = url('upload/logo') . '/' . setting('site_logo');
+                        } else {
+                            $image = url('upload/no-image.png');
+                        }
+
+                        if (!empty($tokens)) {
                             \Helpers::sendNotification($tokens, $notiDesc, $notiTitle, setting('firebase_msg_key'), $image, $detail->id);
                         }
                         
@@ -3495,6 +3689,7 @@ class BlogController extends Controller
                 if (isset($postData['image'])) {
                     unset($postData['image']);
                 }
+                unset($postData['location_tags'], $postData['location_search'], $postData['location_tags_payload']);
                 if (isset($post['is_featured']) && $post['is_featured'] == 'on') {
                     $postData['is_featured'] = 1;
                 } else {
@@ -4139,6 +4334,9 @@ class BlogController extends Controller
                 $st = intval($status);
                 if (in_array($st, [0, 1, 2], true)) {
                     $updateData['status'] = $st;
+                    if ($st === 1 && empty($updateData['schedule_date'])) {
+                        $updateData['schedule_date'] = date("Y-m-d H:i:s");
+                    }
                 }
             }
 
@@ -4208,6 +4406,9 @@ class BlogController extends Controller
 
         $post['status'] = $status;
         $post['id'] = $id;
+        if ((int) $status === 1) {
+            $post['schedule_date'] = date("Y-m-d H:i:s");
+        }
         Blog::updateBlog($post);
 
         if ($blog) {

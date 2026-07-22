@@ -328,9 +328,10 @@ class WalletController extends Controller
             $fileType = strtolower(pathinfo($file, PATHINFO_EXTENSION));
 
             if (in_array($fileType, ['jpg', 'jpeg', 'png', 'gif'])) {
-                $storyti = strip_tags($story->story);
-                $storySlug = substr(($storyti), 0, 50);
-                $storytitle = substr(($storyti), 0, 65);
+                $storyti = html_entity_decode(strip_tags($story->story), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+                $storyti = trim(preg_replace('/\s+/', ' ', $storyti));
+                $storySlug = substr($storyti, 0, 50);
+                $storytitle = substr($storyti, 0, 65);
                 $slug = \Helpers::createSlug($storySlug, 'blog', 0, false);
                 $blog = new Blog();
                 $blog['slug'] = $slug;
@@ -345,6 +346,11 @@ class WalletController extends Controller
                 $blog['status'] = 2; // Save as Draft so it appears in buzz but as draft status
                 $blog['created_by'] = $user_id;
                 $blog['schedule_date'] = null;
+                // Set visibility_opt_1 dynamically ("Your BUZZ" section)
+                $yourBuzzOption = \App\Models\BlogVisibilityOption::where('field_key', 'visibility_opt_1')->where('is_active', 1)->first();
+                if ($yourBuzzOption) {
+                    $blog['visibility_opt_1'] = 1;
+                }
                 $blId = $blog->save();
 
                 /* Copy the banner save in 360 folder */
@@ -448,10 +454,54 @@ class WalletController extends Controller
             }
             */
 
+            // Send push notification and in-app notification to the user
+            // USER REQUESTED NO NOTIFICATION ON ACCEPT/DRAFT STAGE
+            /*
+            $user = \App\Models\User::find($user_id);
+            // Get the dynamic label for the "Your BUZZ" visibility option
+            $yourBuzzOption = \App\Models\BlogVisibilityOption::where('field_key', 'visibility_opt_1')->where('is_active', 1)->first();
+            $buzzSectionName = $yourBuzzOption ? $yourBuzzOption->label : 'Your BUZZ';
+
+            if ($user) {
+                $tokens = [];
+                if (!empty($user->fcm_token)) {
+                    $tokens[] = $user->fcm_token;
+                } elseif (!empty($user->device_token)) {
+                    $tokens[] = $user->device_token;
+                }
+
+                $notiTitle = "Story Published";
+                $notiDesc = "Your Story has been published in the '{$buzzSectionName}' section.";
+
+                if (!empty($tokens)) {
+                    $image = '';
+                    if (file_exists(public_path() . "/upload/logo/" . setting('site_logo'))) {
+                        $image = url('upload/logo') . '/' . setting('site_logo');
+                    } else {
+                        $image = url('upload/no-image.png');
+                    }
+                    \Helpers::sendNotification($tokens, $notiDesc, $notiTitle, setting('firebase_msg_key'), $image, $blId ?? null);
+                }
+
+                \App\Models\Notification::create([
+                    'user_id' => $user_id,
+                    'title'   => $notiTitle,
+                    'decs'    => $notiDesc,
+                ]);
+
+                \App\Models\CustomNotification::create([
+                    'title'   => $notiTitle,
+                    'desc'    => $notiDesc,
+                    'post_id' => $blId ?? null,
+                    'type'    => 'User',
+                ]);
+            }
+            */
+
             return response()->json([
-                'status' => 'success',
-                'message' => __('message_alerts.status_changed_success'),
-                'redirect_url' => route('list_stories', [$request->layout, $request->theme]) // replace with your actual route name
+                'status'       => 'success',
+                'message'      => __('message_alerts.status_changed_success'),
+                'redirect_url' => route('list_stories', ['side-menu', 'light'])
             ]);
         } else {
             return back()->with('success', __('message_alerts.status_changed_success'));
